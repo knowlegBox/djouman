@@ -1,7 +1,6 @@
 # djouman
-une application desktop pour la productivité
+> une application desktop pour la productivité
 
----
 
 ### **Cahier des charges pour l'application desktop "Gestion de Tâches avec Timer Pomodoro"**
 
@@ -182,3 +181,24 @@ L’application doit être compatible avec les principaux systèmes d’exploita
 - **Personnalisation des cycles Pomodoro** : Permettre à l'utilisateur de modifier la durée des cycles de travail et des pauses.
 - **Intégration avec des services tiers** : Possibilité de synchroniser les tâches avec des applications tierces (ex. Google Calendar).
 - **Mode collaboratif** : Partage des tâches et synchronisation du timer Pomodoro avec d’autres utilisateurs.
+
+
+## requirement
+# Fichier requirements.txt
+
+# Bibliothèque pour l'interface utilisateur
+PySide2==5.15.2  # Ou la version la plus récente disponible
+
+# Bibliothèque pour les notifications
+plyer==2.0.0  # Vérifiez la version la plus récente
+
+# Pour la gestion des sons
+playsound==1.3.0  # Vérifiez la version la plus récente
+
+# Pour la gestion du temps et des threads
+schedule==1.1.0  # Vérifiez la version la plus récente
+
+# SQLite3 est généralement inclus avec Python, donc pas besoin de le spécifier.
+
+# Autres dépendances selon vos besoins spécifiques
+
