@@ -87,7 +87,7 @@ Lorsque chaque tâche est terminée, une fenêtre s'affiche avec la tâche suiva
 
 ##### 4.2. **Technologies utilisées**
 - **Langage** : Python
-- **Bibliothèques pour l’interface graphique** : `Tkinter`, `PyQt`, ou `Kivy` (choix à déterminer en fonction des besoins UI/UX).
+- **Bibliothèques pour l’interface graphique** : `PyQt`.
 - **Timer et gestion du temps** : Python `time`, `schedule` ou `threading` pour la gestion des tâches en temps réel.
 - **Notifications** : Bibliothèques comme `Plyer` ou utilisation des API natives du système d'exploitation.
 - **Gestion des fichiers** : `JSON` ou `SQLite` pour la sauvegarde des tâches et de l’historique.
