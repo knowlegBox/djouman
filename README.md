@@ -113,3 +113,72 @@ Le projet sera réalisé en **quatre phases** :
 - **Phase 2 : Développement de la version initiale** avec gestion des tâches et Timer Pomodoro (2 à 3 semaines)
 - **Phase 3 : Ajout des fonctionnalités avancées et améliorations** (2 semaines)
 - **Phase 4 : Tests, correction des bugs et optimisation** (1 semaine)
+
+
+---
+## la partie technique 
+
+
+### **Partie technique du cahier des charges**
+
+#### 1. **Langages et technologies utilisées**
+- **Langage principal** : Python
+- **Interface utilisateur (UI)** : Utilisation de **PySide2** pour la création d'une interface graphique moderne, responsive et multi-plateformes.
+- **Gestion des tâches et Timer** : Utilisation des modules Python pour la gestion des événements et du temps :
+  - **`time`, `threading`** : Gestion des tâches en arrière-plan et exécution des timers (Pomodoro).
+  - **`schedule`** : Planification des tâches à des heures spécifiques.
+
+#### 2. **Architecture logicielle**
+- **Front-end (Interface utilisateur)** :
+  - Composée de fenêtres dynamiques affichant le programme de la journée et les détails des tâches en cours.
+  - Fenêtres flottantes pour signaler les tâches et les transitions entre les cycles de travail et les pauses Pomodoro.
+  - Timer Pomodoro visible, avec transitions en douceur entre les phases de travail et de pause.
+
+- **Back-end (Gestion des données et logique métier)** :
+  - **Gestion des tâches** : Stockage des tâches dans une base de données SQLite.
+  - **Sauvegarde locale** : Utilisation de SQLite pour stocker les tâches planifiées et l’historique des tâches réalisées.
+  - **Gestion des timers et événements** : Multithreading pour l’exécution parallèle des timers et des événements sans interruption de l’interface utilisateur.
+  - **Automatisation du démarrage** : Scripts pour ajouter l’application au démarrage du système (Windows, Linux, MacOS).
+
+#### 3. **Modules Python à utiliser**
+- **`PySide2`** : Création de l'interface utilisateur (fenêtres, boutons, labels, etc.).
+- **`time`**, **`schedule`**, et **`threading`** : Gestion des tâches en arrière-plan, planification et exécution des timers Pomodoro.
+- **`os`** et **`subprocess`** : Gestion du démarrage automatique de l'application.
+- **`plyer`** : Notifications système pour avertir l'utilisateur des changements de tâche ou de la fin d'un cycle.
+- **`sqlite3`** : Base de données locale pour la gestion des tâches et de l'historique.
+- **`playsound` ou `winsound`** : Notifications sonores à la fin de chaque cycle de travail ou pause.
+
+#### 4. **Compatibilité et systèmes d’exploitation**
+L’application doit être compatible avec les principaux systèmes d’exploitation :
+- **Windows** : Utilisation du registre Windows pour le démarrage automatique et les notifications système.
+- **Linux** : Utilisation du fichier `~/.config/autostart` pour démarrer l’application automatiquement.
+- **MacOS** : Utilisation du service de démarrage `launchctl` pour l'exécution au démarrage.
+
+#### 5. **Gestion du Timer Pomodoro**
+- **Cycles de travail** : 25 minutes de travail suivies de 5 minutes de pause.
+- **Écran noir pendant les pauses** : Affichage en plein écran avec un arrière-plan noir pour éviter toute distraction.
+  - Mode plein écran géré par `PySide2`, avec des options pour bloquer les interactions avec d’autres applications (capturer la souris et le clavier).
+- **Compteur de temps visible** : Affichage en temps réel du timer pour chaque tâche, visible dans l'interface utilisateur.
+
+#### 6. **Sauvegarde et historique**
+- **Stockage des tâches** : Les tâches seront enregistrées dans une base de données SQLite.
+- **Historique des tâches** : L'historique des tâches terminées sera archivé pour permettre une analyse du temps passé sur chaque tâche et la génération de rapports de productivité.
+  - Les colonnes incluront les titres des tâches, descriptions, heures de début/fin et durée totale.
+
+#### 7. **Notifications et alertes**
+- **Notifications système** : Utilisation de **`plyer`** pour envoyer des notifications sous forme de pop-ups ou bandeaux.
+- **Alertes sonores** : Des sons seront déclenchés pour signaler la fin d’une tâche ou d’un cycle Pomodoro.
+
+#### 8. **Sécurité et gestion des ressources**
+- **Optimisation des ressources** : L’application fonctionnera en arrière-plan avec une consommation de mémoire (RAM) et de CPU minimale.
+- **Protection des données** : Les données utilisateur (tâches et historique) seront stockées localement dans un dossier sécurisé.
+
+#### 9. **Tests et maintenance**
+- **Tests unitaires** pour les fonctionnalités principales (gestion des tâches, timers, notifications, etc.).
+- **Tests d’intégration** pour garantir la compatibilité multi-plateformes (Windows, MacOS, Linux).
+- Documentation complète du code pour faciliter la maintenance et les futures évolutions.
+
+#### 10. **Extensions et améliorations possibles**
+- **Personnalisation des cycles Pomodoro** : Permettre à l'utilisateur de modifier la durée des cycles de travail et des pauses.
+- **Intégration avec des services tiers** : Possibilité de synchroniser les tâches avec des applications tierces (ex. Google Calendar).
+- **Mode collaboratif** : Partage des tâches et synchronisation du timer Pomodoro avec d’autres utilisateurs.
