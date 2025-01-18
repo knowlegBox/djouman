@@ -1,0 +1,17 @@
+beautifulsoup4==4.12.3
+certifi==2024.8.30
+charset-normalizer==3.4.0
+idna==3.10
+pyler==0.2.0
+pypiwin32==223
+PySide6==6.8.0.2
+PySide6_Addons==6.8.0.2
+PySide6_Essentials==6.8.0.2
+pywin32==308
+requests==2.32.3
+schedule==1.2.2
+screen_brightness_control==0.24.1
+shiboken6==6.8.0.2
+soupsieve==2.6
+urllib3==2.2.3
+WMI==1.5.1
