@@ -1,0 +1,239 @@
+/* Styles CSS pour l'application Todo List Manager */
+
+/* Styles globaux */
+QMainWindow {
+    background-color: #f8f9fa;
+    color: #212529;
+}
+
+/* Boutons */
+QPushButton {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+QPushButton:hover {
+    background-color: #0056b3;
+}
+
+QPushButton:pressed {
+    background-color: #004085;
+}
+
+QPushButton:disabled {
+    background-color: #6c757d;
+    color: #adb5bd;
+}
+
+/* Champs de saisie */
+QLineEdit, QTextEdit, QComboBox {
+    border: 2px solid #dee2e6;
+    border-radius: 4px;
+    padding: 8px;
+    background-color: white;
+    font-size: 12px;
+}
+
+QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
+    border-color: #007bff;
+    outline: none;
+}
+
+QLineEdit:disabled, QTextEdit:disabled, QComboBox:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+}
+
+/* Listes */
+QListWidget {
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background-color: white;
+    alternate-background-color: #f8f9fa;
+    font-size: 12px;
+}
+
+QListWidget::item {
+    padding: 8px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+QListWidget::item:selected {
+    background-color: #007bff;
+    color: white;
+}
+
+QListWidget::item:hover {
+    background-color: #e9ecef;
+}
+
+/* Labels */
+QLabel {
+    color: #495057;
+    font-size: 12px;
+}
+
+/* Groupes */
+QGroupBox {
+    font-weight: bold;
+    border: 2px solid #dee2e6;
+    border-radius: 4px;
+    margin-top: 8px;
+    padding-top: 8px;
+    font-size: 12px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 8px;
+    padding: 0 4px 0 4px;
+    background-color: #f8f9fa;
+}
+
+/* Barres de défilement */
+QScrollBar:vertical {
+    background-color: #f8f9fa;
+    width: 12px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #dee2e6;
+    border-radius: 6px;
+    min-height: 20px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #adb5bd;
+}
+
+QScrollBar:horizontal {
+    background-color: #f8f9fa;
+    height: 12px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: #dee2e6;
+    border-radius: 6px;
+    min-width: 20px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: #adb5bd;
+}
+
+/* Menus */
+QMenu {
+    background-color: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 4px;
+}
+
+QMenu::item {
+    padding: 8px 16px;
+    border-radius: 2px;
+}
+
+QMenu::item:selected {
+    background-color: #007bff;
+    color: white;
+}
+
+/* Messages */
+QMessageBox {
+    background-color: white;
+}
+
+QMessageBox QLabel {
+    color: #212529;
+    font-size: 12px;
+}
+
+/* Dialogues */
+QDialog {
+    background-color: white;
+}
+
+/* Barres d'outils */
+QToolBar {
+    background-color: #e9ecef;
+    border: none;
+    spacing: 4px;
+}
+
+QToolBar QToolButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+QToolBar QToolButton:hover {
+    background-color: #dee2e6;
+}
+
+QToolBar QToolButton:pressed {
+    background-color: #adb5bd;
+}
+
+/* Styles pour les tâches */
+.task-item {
+    background-color: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 8px;
+    margin: 2px;
+}
+
+.task-item:hover {
+    background-color: #f8f9fa;
+    border-color: #007bff;
+}
+
+.task-completed {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.task-pending {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+    color: #856404;
+}
+
+.task-in-progress {
+    background-color: #cce5ff;
+    border-color: #99d6ff;
+    color: #004085;
+}
+
+/* Styles pour les catégories */
+.category-badge {
+    background-color: #e9ecef;
+    color: #495057;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* Styles pour les priorités */
+.priority-low {
+    color: #28a745;
+}
+
+.priority-medium {
+    color: #ffc107;
+}
+
+.priority-high {
+    color: #dc3545;
+}
