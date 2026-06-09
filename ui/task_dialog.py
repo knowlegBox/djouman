@@ -14,10 +14,11 @@ from config.settings import PRIORITY_LEVELS, STATUS_OPTIONS
 class TaskDialog(QDialog):
     """Dialogue pour créer ou modifier une tâche"""
     
-    def __init__(self, task_service: TaskService, category_service: CategoryService, task: Task = None):
+    def __init__(self, task_service, category_service, task=None, settings_service=None):
         super().__init__()
         self.task_service = task_service
         self.category_service = category_service
+        self.settings_service = settings_service
         self.task = task
         
         self.setup_ui()
@@ -71,11 +72,22 @@ class TaskDialog(QDialog):
         self.category_combo = QComboBox()
         form_layout.addRow("Catégorie:", self.category_combo)
         
-        # Date d'échéance
-        self.due_date_input = QDateTimeEdit()
-        self.due_date_input.setDateTime(QDateTime.currentDateTime())
-        self.due_date_input.setCalendarPopup(True)
-        form_layout.addRow("Échéance:", self.due_date_input)
+        # Date de début
+        self.start_date_input = QDateTimeEdit()
+        self.start_date_input.setDateTime(QDateTime.currentDateTime())
+        self.start_date_input.setCalendarPopup(True)
+        form_layout.addRow("Début:", self.start_date_input)
+        
+        # Calcul de la durée par défaut (par défaut 60 mins si non défini)
+        default_dur_mins = 60
+        if getattr(self, 'settings_service', None):
+            default_dur_mins = self.settings_service.get("default_duration_minutes", 60)
+            
+        # Date de fin
+        self.end_date_input = QDateTimeEdit()
+        self.end_date_input.setDateTime(QDateTime.currentDateTime().addSecs(default_dur_mins * 60))
+        self.end_date_input.setCalendarPopup(True)
+        form_layout.addRow("Fin:", self.end_date_input)
         
         layout.addWidget(form_group)
         
@@ -134,9 +146,13 @@ class TaskDialog(QDialog):
                     self.category_combo.setCurrentIndex(i)
                     break
         
-        # Date d'échéance
-        if self.task.due_date:
-            self.due_date_input.setDateTime(self.task.due_date)
+        # Date de début
+        if self.task.start_date:
+            self.start_date_input.setDateTime(self.task.start_date)
+            
+        # Date de fin
+        if self.task.end_date:
+            self.end_date_input.setDateTime(self.task.end_date)
     
     def save_task(self):
         """Sauvegarde la tâche"""
@@ -150,7 +166,12 @@ class TaskDialog(QDialog):
         status = self.status_combo.currentData()
         duration = self.duration_input.value() if self.duration_input.value() > 0 else None
         category_id = self.category_combo.currentData()
-        due_date = self.due_date_input.dateTime().toPython()
+        start_date = self.start_date_input.dateTime().toPython()
+        end_date = self.end_date_input.dateTime().toPython()
+        
+        if start_date > end_date:
+            self.show_error("La date de fin ne peut pas être antérieure à la date de début.")
+            return
         
         if self.task:
             # Modification
@@ -162,7 +183,8 @@ class TaskDialog(QDialog):
                 status=status,
                 duration=duration,
                 category_id=category_id,
-                due_date=due_date
+                start_date=start_date,
+                end_date=end_date
             )
         else:
             # Création
@@ -173,7 +195,8 @@ class TaskDialog(QDialog):
                 status=status,
                 duration=duration,
                 category_id=category_id,
-                due_date=due_date
+                start_date=start_date,
+                end_date=end_date
             ) is not None
         
         if success:

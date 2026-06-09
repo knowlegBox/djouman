@@ -17,7 +17,8 @@ class Task(Base):
     duration = Column(Integer)  # Durée en minutes
     priority = Column(Integer, default=1)  # 1=Faible, 2=Moyen, 3=Élevé
     status = Column(String(20), default='pending')  # pending, in_progress, completed, cancelled
-    due_date = Column(DateTime)
+    start_date = Column(DateTime)
+    end_date = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     category_id = Column(Integer, ForeignKey('categories.id'))

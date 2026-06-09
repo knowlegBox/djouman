@@ -15,7 +15,8 @@ class TaskService:
         self.db_service = db_service
     
     def create_task(self, title: str, description: str = None, duration: int = None, 
-                   priority: int = 1, status: str = 'pending', category_id: int = None, due_date: str = None) -> Optional[Task]:
+                   priority: int = 1, status: str = 'pending', category_id: int = None, 
+                   start_date: str = None, end_date: str = None) -> Optional[Task]:
         """Crée une nouvelle tâche"""
         session = self.db_service.get_session()
         try:
@@ -26,7 +27,8 @@ class TaskService:
                 priority=priority,
                 status=status,
                 category_id=category_id,
-                due_date=due_date
+                start_date=start_date,
+                end_date=end_date
             )
             session.add(task)
             session.commit()
