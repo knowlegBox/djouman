@@ -136,7 +136,7 @@ class TaskDialog(QDialog):
         
         # Date d'échéance
         if self.task.due_date:
-            self.due_date_input.setDateTime(QDateTime.fromPython(self.task.due_date))
+            self.due_date_input.setDateTime(self.task.due_date)
     
     def save_task(self):
         """Sauvegarde la tâche"""

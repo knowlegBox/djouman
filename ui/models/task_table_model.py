@@ -58,11 +58,11 @@ class TaskTableModel(QAbstractTableModel):
             elif column == 3:  # Priorité
                 return format_priority(task.priority)
             elif column == 4:  # Durée
-                return format_duration(task.duration) if task.duration else "N/A"
+                return format_duration(task.duration) if task.duration else "-"
             elif column == 5:  # Catégorie
                 return task.category.name if task.category else "Aucune"
             elif column == 6:  # Date d'échéance
-                return task.due_date.strftime("%d/%m/%Y %H:%M") if task.due_date else "N/A"
+                return task.due_date.strftime("%d/%m/%Y %H:%M") if task.due_date else "-"
             elif column == 7:  # Créée le
                 return task.created_at.strftime("%d/%m/%Y %H:%M")
         

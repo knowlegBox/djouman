@@ -100,6 +100,19 @@ class MainWindow(QMainWindow):
         details_layout.addWidget(self.task_title)
         details_layout.addWidget(self.task_description)
         details_layout.addWidget(self.task_details)
+        
+        # Graphe de statistiques
+        try:
+            from PySide6.QtCharts import QChartView
+            from PySide6.QtGui import QPainter
+            self.chart_view = QChartView()
+            self.chart_view.setRenderHint(QPainter.Antialiasing)
+            self.chart_view.setMinimumHeight(200)
+            details_layout.addWidget(self.chart_view)
+        except ImportError:
+            self.chart_view = None
+            print("QtCharts non disponible")
+            
         details_layout.addStretch()
         
         content_splitter.addWidget(self.task_table)
@@ -123,6 +136,7 @@ class MainWindow(QMainWindow):
         
         self.task_table.selectionModel().selectionChanged.connect(self.show_task_details)
         self.task_table.customContextMenuRequested.connect(self.show_context_menu)
+        self.task_table.doubleClicked.connect(self.edit_task_by_index)
     
     def apply_styles(self):
         """Applique les styles CSS"""
@@ -132,6 +146,7 @@ class MainWindow(QMainWindow):
         """Charge les données"""
         self.load_tasks()
         self.load_categories()
+        self.update_chart()
     
     def load_tasks(self):
         """Charge la liste des tâches"""
@@ -141,6 +156,16 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'task_model'):
             self.task_model = TaskTableModel(tasks)
             self.task_table.setModel(self.task_model)
+            
+            # Ajustement des colonnes une fois le modèle défini
+            header = self.task_table.horizontalHeader()
+            header.setSectionResizeMode(QHeaderView.Stretch)
+            header.setSectionResizeMode(2, QHeaderView.ResizeToContents) # Statut
+            header.setSectionResizeMode(3, QHeaderView.ResizeToContents) # Priorité
+            header.setSectionResizeMode(4, QHeaderView.ResizeToContents) # Durée
+            header.setSectionResizeMode(5, QHeaderView.ResizeToContents) # Catégorie
+            header.setSectionResizeMode(6, QHeaderView.ResizeToContents) # Date échéance
+            header.setSectionResizeMode(7, QHeaderView.ResizeToContents) # Créée le
         else:
             self.task_model.set_tasks(tasks)
     
@@ -191,8 +216,88 @@ class MainWindow(QMainWindow):
     
     def filter_tasks(self):
         """Filtre les tâches selon les critères"""
-        # Implémentation du filtrage
-        pass
+        search_text = self.search_input.text().lower()
+        status_text = self.status_filter.currentText()
+        category_text = self.category_filter.currentText()
+        
+        all_tasks = self.task_service.get_all_tasks()
+        filtered_tasks = []
+        
+        for task in all_tasks:
+            # Filtre de recherche texte (titre ou description)
+            match_search = True
+            if search_text:
+                title = task.title.lower() if task.title else ""
+                desc = task.description.lower() if task.description else ""
+                if search_text not in title and search_text not in desc:
+                    match_search = False
+            
+            # Filtre de statut
+            match_status = True
+            if status_text != "Tous":
+                if format_status(task.status) != status_text:
+                    match_status = False
+                    
+            # Filtre de catégorie
+            match_category = True
+            if category_text != "Toutes les catégories":
+                cat_name = task.category.name if task.category else "Aucune"
+                if cat_name != category_text:
+                    match_category = False
+            
+            if match_search and match_status and match_category:
+                filtered_tasks.append(task)
+                
+        if hasattr(self, 'task_model'):
+            self.task_model.set_tasks(filtered_tasks)
+            self.update_chart()
+            
+    def update_chart(self):
+        """Met à jour le graphique des statistiques"""
+        if not hasattr(self, 'chart_view') or not self.chart_view:
+            return
+            
+        try:
+            from PySide6.QtCharts import QChart, QPieSeries
+            from utils import get_status_color
+            
+            # Calculer les statistiques à partir des tâches actuellement filtrées
+            tasks = []
+            if hasattr(self, 'task_model'):
+                tasks = self.task_model.tasks
+                
+            total = len(tasks)
+            
+            if total == 0:
+                self.chart_view.setChart(QChart())
+                return
+                
+            pending = sum(1 for t in tasks if t.status == 'pending')
+            in_progress = sum(1 for t in tasks if t.status == 'in_progress')
+            completed = sum(1 for t in tasks if t.status == 'completed')
+            
+            series = QPieSeries()
+            
+            if pending > 0:
+                slice_pending = series.append(f"En attente ({pending})", pending)
+                slice_pending.setColor(QColor(get_status_color('pending')))
+                
+            if in_progress > 0:
+                slice_progress = series.append(f"En cours ({in_progress})", in_progress)
+                slice_progress.setColor(QColor(get_status_color('in_progress')))
+                
+            if completed > 0:
+                slice_completed = series.append(f"Terminée ({completed})", completed)
+                slice_completed.setColor(QColor(get_status_color('completed')))
+                
+            chart = QChart()
+            chart.addSeries(series)
+            chart.setTitle("Répartition des tâches affichées")
+            chart.legend().setAlignment(Qt.AlignBottom)
+            
+            self.chart_view.setChart(chart)
+        except Exception as e:
+            print(f"Erreur lors de la mise à jour du graphique: {e}")
     
     def show_context_menu(self, position):
         """Affiche le menu contextuel"""
@@ -226,11 +331,20 @@ class MainWindow(QMainWindow):
             dialog = TaskDialog(self.task_service, self.category_service, task)
             if dialog.exec() == TaskDialog.Accepted:
                 self.load_tasks()
+                self.filter_tasks() # Réapplique le filtre après édition
+                
+    def edit_task_by_index(self, index):
+        """Modifie une tâche suite à un double-clic dans le tableau"""
+        if index.isValid():
+            task = self.task_model.get_task(index.row())
+            if task:
+                self.edit_task(task)
     
     def complete_task(self, task):
         """Marque une tâche comme terminée"""
         if self.task_service.mark_completed(task.id):
             self.load_tasks()
+            self.update_chart()
             QMessageBox.information(self, "Succès", "Tâche marquée comme terminée")
     
     def delete_task(self, task):
@@ -244,6 +358,7 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             if self.task_service.delete_task(task.id):
                 self.load_tasks()
+                self.update_chart()
                 QMessageBox.information(self, "Succès", "Tâche supprimée")
     
     def closeEvent(self, event):
