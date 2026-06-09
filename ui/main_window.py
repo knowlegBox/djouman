@@ -4,17 +4,20 @@ Fenêtre principale de l'application Todo List
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                                QPushButton, QLineEdit, QComboBox, QTableView, 
                                QLabel, QGroupBox, QSplitter, QHeaderView,
-                               QMessageBox, QMenu)
+                               QMessageBox, QMenu, QTabWidget)
 from PySide6.QtGui import QAction
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QIcon, QFont, QColor
-from services import DatabaseService, TaskService, CategoryService
+from datetime import datetime, timedelta
+from services import DatabaseService, TaskService, CategoryService, SettingsService
 from models import Task, Category
 from utils import format_duration, format_priority, format_status, get_priority_color, get_status_color
 from config.settings import WINDOW_TITLE, WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT, DEFAULT_STYLES
 from ui.models.task_table_model import TaskTableModel
 from ui.task_dialog import TaskDialog
 from ui.category_dialog import CategoryDialog
+from ui.widgets.screen_blocker import TaskScreenBlocker
+from ui.widgets.settings_tab import SettingsTab
 
 
 class MainWindow(QMainWindow):
@@ -22,6 +25,7 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        self.settings_service = SettingsService()
         self.db_service = DatabaseService()
         self.task_service = TaskService(self.db_service)
         self.category_service = CategoryService(self.db_service)
@@ -30,6 +34,13 @@ class MainWindow(QMainWindow):
         self.load_data()
         self.setup_connections()
         self.apply_styles()
+        
+        # Initialisation du système de notification
+        self.notified_tasks = {}
+        self.active_blockers = []
+        self.notification_timer = QTimer(self)
+        self.notification_timer.timeout.connect(self.check_due_tasks)
+        self.notification_timer.start(10000)  # Toutes les 10 secondes
     
     def setup_ui(self):
         """Configure l'interface utilisateur"""
@@ -42,6 +53,13 @@ class MainWindow(QMainWindow):
         
         # Layout principal
         main_layout = QVBoxLayout(central_widget)
+        
+        self.tabs = QTabWidget()
+        main_layout.addWidget(self.tabs)
+        
+        # --- Onglet Tâches ---
+        tasks_tab = QWidget()
+        tasks_layout = QVBoxLayout(tasks_tab)
         
         # Barre d'outils
         toolbar_layout = QHBoxLayout()
@@ -119,10 +137,22 @@ class MainWindow(QMainWindow):
         content_splitter.addWidget(details_widget)
         content_splitter.setSizes([600, 300])
         
-        # Ajout des éléments au layout principal
-        main_layout.addLayout(toolbar_layout)
-        main_layout.addLayout(search_layout)
-        main_layout.addWidget(content_splitter)
+        # Ajout des éléments au layout principal de l'onglet
+        tasks_layout.addLayout(toolbar_layout)
+        tasks_layout.addLayout(search_layout)
+        tasks_layout.addWidget(content_splitter)
+        
+        self.tabs.addTab(tasks_tab, "📝 Tâches")
+        
+        # --- Onglet Paramètres ---
+        self.settings_tab = SettingsTab(self.settings_service)
+        self.settings_tab.settings_changed.connect(self.on_settings_changed)
+        self.tabs.addTab(self.settings_tab, "⚙️ Paramètres")
+        
+    def on_settings_changed(self):
+        """Callback quand les paramètres sont modifiés"""
+        self.load_data()  # Recharger les tâches si hide_completed_tasks a changé
+        self.filter_tasks()
     
     def setup_connections(self):
         """Configure les connexions des signaux"""
@@ -180,9 +210,10 @@ class MainWindow(QMainWindow):
     
     def add_task(self):
         """Ouvre le dialogue d'ajout de tâche"""
-        dialog = TaskDialog(self.task_service, self.category_service)
+        dialog = TaskDialog(self.task_service, self.category_service, settings_service=self.settings_service)
         if dialog.exec() == TaskDialog.Accepted:
             self.load_tasks()
+            self.update_chart()
     
     def add_category(self):
         """Ouvre le dialogue d'ajout de catégorie"""
@@ -209,8 +240,10 @@ class MainWindow(QMainWindow):
                 details.append(f"Durée: {format_duration(task.duration)}")
             if task.category:
                 details.append(f"Catégorie: {task.category.name}")
-            if task.due_date:
-                details.append(f"Échéance: {task.due_date.strftime('%d/%m/%Y %H:%M')}")
+            if task.start_date:
+                details.append(f"Début: {task.start_date.strftime('%d/%m/%Y %H:%M')}")
+            if task.end_date:
+                details.append(f"Fin: {task.end_date.strftime('%d/%m/%Y %H:%M')}")
             
             self.task_details.setText("\n".join(details))
     
@@ -223,7 +256,13 @@ class MainWindow(QMainWindow):
         all_tasks = self.task_service.get_all_tasks()
         filtered_tasks = []
         
+        hide_completed = getattr(self, 'settings_service', None) and self.settings_service.get("hide_completed_tasks", False)
+        
         for task in all_tasks:
+            # Masquer les tâches terminées par défaut si le paramètre est actif
+            if status_text == "Tous" and hide_completed and task.status == 'completed':
+                continue
+                
             # Filtre de recherche texte (titre ou description)
             match_search = True
             if search_text:
@@ -298,31 +337,94 @@ class MainWindow(QMainWindow):
             self.chart_view.setChart(chart)
         except Exception as e:
             print(f"Erreur lors de la mise à jour du graphique: {e}")
+            
+    def check_due_tasks(self):
+        """Vérifie si une tâche a dépassé son échéance et affiche l'écran noir si nécessaire"""
+        if not hasattr(self, 'task_model'):
+            return
+            
+        if not self.settings_service.get("enable_screen_blocker", True):
+            return
+            
+        snooze_delay = self.settings_service.get("snooze_delay_minutes", 5)
+        now = datetime.now()
+        
+        # Nettoyer les blockers fermés
+        self.active_blockers = [b for b in self.active_blockers if b.isVisible()]
+        # Appliquer les paramètres (ex: masquer les terminées)
+        hide_completed = self.settings_service.get("hide_completed_tasks", False)
+        
+        filtered_tasks = []
+        for task in self.task_service.get_all_tasks():
+            if hide_completed and task.status == 'completed':
+                continue
+            
+            if task.status in ['pending', 'in_progress'] and task.start_date:
+                if now >= task.start_date:
+                    should_notify = False
+                    
+                    if task.id not in self.notified_tasks:
+                        should_notify = True
+                    else:
+                        last_notified = self.notified_tasks[task.id]
+                        # Snooze basé sur les paramètres
+                        if now >= last_notified + timedelta(minutes=snooze_delay):
+                            should_notify = True
+                            
+                    if should_notify:
+                        # Ne pas afficher si un écran pour cette tâche est déjà visible
+                        already_shown = any(hasattr(b, 'task') and b.task.id == task.id for b in self.active_blockers)
+                        if not already_shown:
+                            self.show_task_blocker(task)
+                            
+    def show_task_blocker(self, task):
+        """Affiche l'écran noir pour une tâche"""
+        blocker = TaskScreenBlocker(task, self.on_blocker_dismissed)
+        self.active_blockers.append(blocker)
+        blocker.showFullScreen()
+        
+    def on_blocker_dismissed(self, task_id):
+        """Callback appelé quand l'utilisateur clique sur Quitter"""
+        self.notified_tasks[task_id] = datetime.now()
     
     def show_context_menu(self, position):
         """Affiche le menu contextuel"""
-        index = self.task_table.indexAt(position)
-        if not index.isValid():
+        indexes = self.task_table.selectionModel().selectedRows()
+        if not indexes:
             return
-        
-        task = self.task_model.get_task(index.row())
-        if not task:
+            
+        tasks = [self.task_model.get_task(idx.row()) for idx in indexes if self.task_model.get_task(idx.row())]
+        if not tasks:
             return
-        
+            
         menu = QMenu(self)
         
-        edit_action = QAction("✏️ Modifier", self)
-        edit_action.triggered.connect(lambda: self.edit_task(task))
-        menu.addAction(edit_action)
-        
-        complete_action = QAction("✅ Terminer", self)
-        complete_action.triggered.connect(lambda: self.complete_task(task))
-        menu.addAction(complete_action)
-        
-        delete_action = QAction("🗑️ Supprimer", self)
-        delete_action.triggered.connect(lambda: self.delete_task(task))
-        menu.addAction(delete_action)
-        
+        if len(tasks) == 1:
+            task = tasks[0]
+            edit_action = QAction("✏️ Modifier", self)
+            edit_action.triggered.connect(lambda checked=False, t=task: self.edit_task(t))
+            menu.addAction(edit_action)
+            
+            status_menu = menu.addMenu("🔄 Changer le statut")
+            for status_value, status_label in [('pending', 'En attente'), ('in_progress', 'En cours'), ('completed', 'Terminée'), ('cancelled', 'Annulée')]:
+                action = QAction(status_label, self)
+                action.triggered.connect(lambda checked=False, t=task, s=status_value: self.change_task_status(t, s))
+                status_menu.addAction(action)
+                
+            delete_action = QAction("🗑️ Supprimer", self)
+            delete_action.triggered.connect(lambda checked=False, t=task: self.delete_task(t))
+            menu.addAction(delete_action)
+        else:
+            status_menu = menu.addMenu(f"🔄 Changer le statut ({len(tasks)} tâches)")
+            for status_value, status_label in [('pending', 'En attente'), ('in_progress', 'En cours'), ('completed', 'Terminée'), ('cancelled', 'Annulée')]:
+                action = QAction(status_label, self)
+                action.triggered.connect(lambda checked=False, ts=tasks, s=status_value: self.change_tasks_status(ts, s))
+                status_menu.addAction(action)
+                
+            delete_action = QAction(f"🗑️ Supprimer les {len(tasks)} tâches", self)
+            delete_action.triggered.connect(lambda checked=False, ts=tasks: self.delete_tasks(ts))
+            menu.addAction(delete_action)
+            
         menu.exec(self.task_table.mapToGlobal(position))
     
     def edit_task(self, task):
@@ -346,6 +448,20 @@ class MainWindow(QMainWindow):
             self.load_tasks()
             self.update_chart()
             QMessageBox.information(self, "Succès", "Tâche marquée comme terminée")
+
+    def change_task_status(self, task, status):
+        """Change le statut d'une tâche"""
+        if self.task_service.update_task(task.id, status=status):
+            self.load_tasks()
+            self.update_chart()
+            
+    def change_tasks_status(self, tasks, status):
+        """Change le statut de plusieurs tâches"""
+        for task in tasks:
+            self.task_service.update_task(task.id, status=status)
+        self.load_tasks()
+        self.update_chart()
+        QMessageBox.information(self, "Succès", f"Statut mis à jour pour {len(tasks)} tâches")
     
     def delete_task(self, task):
         """Supprime une tâche"""
@@ -360,6 +476,21 @@ class MainWindow(QMainWindow):
                 self.load_tasks()
                 self.update_chart()
                 QMessageBox.information(self, "Succès", "Tâche supprimée")
+                
+    def delete_tasks(self, tasks):
+        """Supprime plusieurs tâches"""
+        reply = QMessageBox.question(
+            self, "Confirmation", 
+            f"Êtes-vous sûr de vouloir supprimer ces {len(tasks)} tâches ?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            for task in tasks:
+                self.task_service.delete_task(task.id)
+            self.load_tasks()
+            self.update_chart()
+            QMessageBox.information(self, "Succès", f"{len(tasks)} tâches supprimées")
     
     def closeEvent(self, event):
         """Ferme l'application proprement"""

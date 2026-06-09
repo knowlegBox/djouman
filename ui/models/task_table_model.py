@@ -21,15 +21,16 @@ class TaskTableModel(QAbstractTableModel):
             "Priorité",
             "Durée",
             "Catégorie",
-            "Date d'échéance",
+            "Début",
+            "Fin",
             "Créée le"
         ]
     
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent=None):
         """Retourne le nombre de lignes"""
         return len(self.tasks)
     
-    def columnCount(self, parent=QModelIndex()):
+    def columnCount(self, parent=None):
         """Retourne le nombre de colonnes"""
         return len(self.headers)
     
@@ -61,9 +62,11 @@ class TaskTableModel(QAbstractTableModel):
                 return format_duration(task.duration) if task.duration else "-"
             elif column == 5:  # Catégorie
                 return task.category.name if task.category else "Aucune"
-            elif column == 6:  # Date d'échéance
-                return task.due_date.strftime("%d/%m/%Y %H:%M") if task.due_date else "-"
-            elif column == 7:  # Créée le
+            elif column == 6:  # Début
+                return task.start_date.strftime("%d/%m/%Y %H:%M") if task.start_date else "-"
+            elif column == 7:  # Fin
+                return task.end_date.strftime("%d/%m/%Y %H:%M") if task.end_date else "-"
+            elif column == 8:  # Créée le
                 return task.created_at.strftime("%d/%m/%Y %H:%M")
         
         elif role == Qt.BackgroundRole:
@@ -76,7 +79,7 @@ class TaskTableModel(QAbstractTableModel):
                 return QColor(color)
         
         elif role == Qt.TextAlignmentRole:
-            if column in [3, 4, 6, 7]:  # Colonnes numériques et dates
+            if column in [3, 4, 6, 7, 8]:  # Colonnes numériques et dates
                 return Qt.AlignCenter
             else:
                 return Qt.AlignLeft | Qt.AlignVCenter
