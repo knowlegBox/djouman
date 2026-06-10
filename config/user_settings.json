@@ -2,5 +2,6 @@
     "enable_screen_blocker": true,
     "snooze_delay_minutes": 5,
     "default_duration_minutes": 60,
-    "hide_completed_tasks": false
+    "hide_completed_tasks": false,
+    "theme": "dark"
 }

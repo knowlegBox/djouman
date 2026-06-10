@@ -60,11 +60,14 @@ ICON_MAPPING = {
 }
 
 # Styles CSS
-DEFAULT_STYLES = """
-QMainWindow {
+LIGHT_THEME = """
+QMainWindow, QDialog {
     background-color: #f8f9fa;
 }
-
+QWidget {
+    color: #495057;
+    font-family: 'Inter', sans-serif;
+}
 QPushButton {
     background-color: #007bff;
     color: white;
@@ -73,58 +76,112 @@ QPushButton {
     border-radius: 4px;
     font-weight: bold;
 }
-
-QPushButton:hover {
-    background-color: #0056b3;
-}
-
-QPushButton:pressed {
-    background-color: #004085;
-}
-
+QPushButton:hover { background-color: #0056b3; }
+QPushButton:pressed { background-color: #004085; }
 QLineEdit, QTextEdit, QComboBox {
     border: 2px solid #dee2e6;
     border-radius: 4px;
     padding: 8px;
     background-color: white;
 }
-
-QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
-    border-color: #007bff;
+QLineEdit:focus, QTextEdit:focus, QComboBox:focus { border-color: #007bff; }
+QComboBox QAbstractItemView {
+    background-color: white;
+    color: black;
+    selection-background-color: #007bff;
+    selection-color: white;
 }
-
-QListWidget {
+QListWidget, QTableView {
     border: 1px solid #dee2e6;
     border-radius: 4px;
     background-color: white;
     alternate-background-color: #f8f9fa;
+    gridline-color: #dee2e6;
 }
-
-QListWidget::item {
-    padding: 8px;
-    border-bottom: 1px solid #dee2e6;
-}
-
-QListWidget::item:selected {
-    background-color: #007bff;
-    color: white;
-}
-
-QLabel {
-    color: #495057;
-}
-
-QGroupBox {
+QListWidget::item, QTableView::item { padding: 8px; border-bottom: 1px solid #dee2e6; }
+QListWidget::item:selected, QTableView::item:selected { background-color: #007bff; color: white; }
+QHeaderView::section {
+    background-color: #f8f9fa;
+    padding: 4px;
+    border: 1px solid #dee2e6;
     font-weight: bold;
-    border: 2px solid #dee2e6;
-    border-radius: 4px;
-    margin-top: 8px;
-    padding-top: 8px;
 }
+QGroupBox { font-weight: bold; border: 2px solid #dee2e6; border-radius: 4px; margin-top: 8px; padding-top: 8px; }
+QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px 0 4px; }
+"""
 
-QGroupBox::title {
-    subcontrol-origin: margin;
-    left: 8px;
-    padding: 0 4px 0 4px;
+DARK_THEME = """
+QMainWindow, QDialog {
+    background-color: #0e1511;
+}
+QWidget {
+    color: #dde5dd;
+    font-family: 'Inter', sans-serif;
+}
+QPushButton {
+    background-color: #4edea3;
+    color: #003824;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+QPushButton:hover { background-color: #0fb981; }
+QPushButton:pressed { background-color: #006c49; }
+QPushButton#secondary_btn {
+    background-color: transparent;
+    color: #9ed2b5;
+    border: 1px solid #3c4a42;
+}
+QPushButton#secondary_btn:hover { background-color: #1a211d; }
+QLineEdit, QTextEdit, QComboBox, QSpinBox, QDateEdit, QTimeEdit {
+    border: 1px solid #3c4a42;
+    border-radius: 4px;
+    padding: 8px;
+    background-color: #1a211d;
+    color: #dde5dd;
+}
+QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus {
+    border-color: #4edea3;
+}
+QComboBox QAbstractItemView {
+    background-color: white;
+    color: black;
+    selection-background-color: #4edea3;
+    selection-color: black;
+}
+QListWidget, QTableView {
+    border: 1px solid #3c4a42;
+    border-radius: 4px;
+    background-color: #161d19;
+    alternate-background-color: #1a211d;
+    gridline-color: #2f3732;
+    color: #dde5dd;
+}
+QListWidget::item, QTableView::item { padding: 8px; border-bottom: 1px solid #2f3732; }
+QListWidget::item:selected, QTableView::item:selected { background-color: #242c27; color: #4edea3; border: 1px solid #4edea3;}
+QHeaderView::section {
+    background-color: #09100c;
+    color: #bbcabf;
+    padding: 8px;
+    border: 1px solid #2f3732;
+    font-weight: bold;
+}
+QGroupBox { font-weight: bold; border: 1px solid #3c4a42; border-radius: 4px; margin-top: 8px; padding-top: 8px; color: #4edea3; }
+QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px 0 4px; }
+QScrollBar:vertical {
+    background: #09100c;
+    width: 10px;
+    margin: 0px 0px 0px 0px;
+}
+QScrollBar::handle:vertical {
+    background: #2f3732;
+    min-height: 20px;
+    border-radius: 5px;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
 }
 """
+
+DEFAULT_STYLES = LIGHT_THEME

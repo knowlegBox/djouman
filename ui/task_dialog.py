@@ -14,8 +14,8 @@ from config.settings import PRIORITY_LEVELS, STATUS_OPTIONS
 class TaskDialog(QDialog):
     """Dialogue pour créer ou modifier une tâche"""
     
-    def __init__(self, task_service, category_service, task=None, settings_service=None):
-        super().__init__()
+    def __init__(self, task_service, category_service, task=None, settings_service=None, parent=None):
+        super().__init__(parent)
         self.task_service = task_service
         self.category_service = category_service
         self.settings_service = settings_service

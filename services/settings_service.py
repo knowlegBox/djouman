@@ -10,7 +10,8 @@ class SettingsService:
             "enable_screen_blocker": True,
             "snooze_delay_minutes": 5,
             "default_duration_minutes": 60,
-            "hide_completed_tasks": False
+            "hide_completed_tasks": False,
+            "theme": "dark"
         }
         self.settings = self.load_settings()
 
