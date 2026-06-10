@@ -9,7 +9,7 @@ pip install pyinstaller
 
 echo.
 echo [2/2] Compilation de l'application (cela peut prendre quelques minutes)...
-pyinstaller --name "Djuma" --windowed --noconsole --noconfirm --clean --icon="icon.ico" main.py
+pyinstaller --name "Djuma" --onefile --windowed --noconsole --noconfirm --clean --icon="icon.ico" main.py
 
 echo.
 echo ===================================================
