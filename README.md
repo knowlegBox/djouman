@@ -41,7 +41,7 @@ La fonctionnalité phare de Djuma :
 ## 🚀 Installation & Utilisation
 
 ### Prérequis
-Assurez-vous d'avoir Python 3.9+ installé sur votre machine.
+Assurez-vous d'avoir Python 3.14+ installé sur votre machine.
 
 ### Installation
 1. Cloner le projet :
