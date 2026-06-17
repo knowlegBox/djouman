@@ -311,7 +311,7 @@ class MainWindow(QMainWindow):
     
     def add_category(self):
         """Ouvre le dialogue d'ajout de catégorie"""
-        dialog = CategoryDialog(self.category_service, self)
+        dialog = CategoryDialog(self.category_service, parent=self)
         if dialog.exec() == CategoryDialog.Accepted:
             self.load_categories()
     

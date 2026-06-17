@@ -13,9 +13,9 @@ ICONS_DIR = ASSETS_DIR / "icons"
 DATABASE_URL = "sqlite:///todo.db"
 
 # Configuration de l'interface
-WINDOW_TITLE = "Todo List Manager"
-WINDOW_MIN_WIDTH = 800
-WINDOW_MIN_HEIGHT = 600
+WINDOW_TITLE = "Djuma"
+WINDOW_MIN_WIDTH = 1050
+WINDOW_MIN_HEIGHT = 750
 
 # Configuration des tâches
 DEFAULT_PRIORITY = 1

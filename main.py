@@ -24,6 +24,16 @@ def setup_application():
     app.setApplicationVersion("1.0.0")
     app.setOrganizationName("TodoListApp")
     
+    from PySide6.QtGui import QIcon
+    icon_path = os.path.join(root_dir, "icon.ico")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+        
+    if os.name == 'nt':
+        import ctypes
+        myappid = 'knowlegbox.djouman.todolist.1.0.0'
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    
     # Configuration des styles
     app.setStyleSheet(DEFAULT_STYLES)
     
