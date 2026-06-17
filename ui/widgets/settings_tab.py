@@ -3,6 +3,8 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QFormLayout,
                                QMessageBox)
 from PySide6.QtCore import Signal
 
+from utils.startup_manager import StartupManager
+
 class SettingsTab(QWidget):
     """Onglet de gestion des paramètres"""
     
@@ -26,6 +28,13 @@ class SettingsTab(QWidget):
         self.theme_combo.addItem("Mode Sombre (Djuma)", "dark")
         self.theme_combo.addItem("Mode Clair", "light")
         app_layout.addRow("Thème visuel:", self.theme_combo)
+
+        # Groupe Système
+        sys_group = QGroupBox("Système")
+        sys_layout = QFormLayout(sys_group)
+        
+        self.startup_cb = QCheckBox("Lancer Djuma au démarrage de Windows (Tâches du jour)")
+        sys_layout.addRow("", self.startup_cb)
 
         # Groupe Notifications
         notif_group = QGroupBox("Notifications & Rappels")
@@ -62,6 +71,7 @@ class SettingsTab(QWidget):
         btn_layout.addWidget(self.save_btn)
         
         layout.addWidget(app_group)
+        layout.addWidget(sys_group)
         layout.addWidget(notif_group)
         layout.addWidget(task_group)
         layout.addLayout(btn_layout)
@@ -69,6 +79,7 @@ class SettingsTab(QWidget):
 
     def load_settings(self):
         """Charge les paramètres actuels dans l'interface"""
+        self.startup_cb.setChecked(StartupManager.is_run_on_startup_enabled())
         self.enable_blocker_cb.setChecked(self.settings_service.get("enable_screen_blocker", True))
         self.hide_completed_cb.setChecked(self.settings_service.get("hide_completed_tasks", False))
         
@@ -89,6 +100,9 @@ class SettingsTab(QWidget):
 
     def save_settings(self):
         """Sauvegarde les paramètres et notifie l'application"""
+        # Save Windows startup option
+        StartupManager.set_run_on_startup(self.startup_cb.isChecked())
+        
         self.settings_service.set("enable_screen_blocker", self.enable_blocker_cb.isChecked())
         self.settings_service.set("hide_completed_tasks", self.hide_completed_cb.isChecked())
         self.settings_service.set("snooze_delay_minutes", self.snooze_combo.currentData())

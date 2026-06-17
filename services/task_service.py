@@ -146,6 +146,30 @@ class TaskService:
             return []
         finally:
             session.close()
+            
+    def get_tasks_for_today(self) -> List[Task]:
+        """Récupère les tâches prévues pour aujourd'hui (non terminées)"""
+        session = self.db_service.get_session()
+        try:
+            from sqlalchemy.orm import joinedload
+            from sqlalchemy import and_
+            from datetime import datetime, time
+            
+            today_start = datetime.combine(datetime.now().date(), time.min)
+            today_end = datetime.combine(datetime.now().date(), time.max)
+            
+            return session.query(Task).options(joinedload(Task.category)).filter(
+                and_(
+                    Task.start_date >= today_start,
+                    Task.start_date <= today_end,
+                    Task.is_completed == False
+                )
+            ).order_by(Task.start_date.asc()).all()
+        except SQLAlchemyError as e:
+            print(f"Erreur lors de la récupération des tâches du jour : {e}")
+            return []
+        finally:
+            session.close()
     
     def get_task_statistics(self) -> Dict[str, Any]:
         """Retourne les statistiques des tâches"""

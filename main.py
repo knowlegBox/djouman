@@ -69,6 +69,11 @@ def show_error_dialog(title, message):
 
 def main():
     """Fonction principale de l'application"""
+    import argparse
+    parser = argparse.ArgumentParser(description="Djuma Todo List Manager")
+    parser.add_argument("--startup", action="store_true", help="Launch in startup mode (Daily Briefing)")
+    args = parser.parse_args()
+
     print("🚀 Démarrage de Todo List Manager...")
     
     try:
@@ -81,16 +86,37 @@ def main():
         
         # Création des services
         category_service = CategoryService(db_service)
+        from services.task_service import TaskService
+        task_service = TaskService(db_service)
         print("✅ Services créés")
         
         # Création des catégories par défaut
         create_default_categories(category_service)
         
-        # Création de la fenêtre principale
-        print("🖥️ Création de l'interface utilisateur...")
-        window = MainWindow()
-        window.show()
-        print("✅ Interface utilisateur créée et affichée")
+        if args.startup:
+            print("🌅 Mode démarrage: Affichage des tâches du jour")
+            from ui.daily_briefing_dialog import DailyBriefingDialog
+            
+            briefing_dialog = DailyBriefingDialog(task_service)
+            
+            # Fonction pour ouvrir la fenêtre principale si l'utilisateur clique sur "Ouvrir Djuma"
+            def open_main_window():
+                global main_window_instance
+                print("🖥️ Création de l'interface utilisateur principale...")
+                main_window_instance = MainWindow()
+                main_window_instance.show()
+                
+            briefing_dialog.open_main_app.connect(open_main_window)
+            
+            # Afficher le dialogue
+            briefing_dialog.show()
+        else:
+            # Création de la fenêtre principale normale
+            print("🖥️ Création de l'interface utilisateur...")
+            global main_window_instance
+            main_window_instance = MainWindow()
+            main_window_instance.show()
+            print("✅ Interface utilisateur créée et affichée")
         
         # Message de démarrage réussi
         print("🎉 Application démarrée avec succès !")
@@ -108,6 +134,8 @@ def main():
     except Exception as e:
         error_msg = f"Erreur inattendue : {str(e)}\n\nVérifiez que tous les fichiers sont présents et que les dépendances sont installées."
         print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
         show_error_dialog("Erreur de démarrage", error_msg)
         return 1
 
