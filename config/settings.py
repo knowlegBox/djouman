@@ -55,7 +55,7 @@ ICON_MAPPING = {
     'book': '📚',
     'car': '🚗',
     'shopping': '🛒',
-    'star': '⭐',
+    'star': '',
     'flag': '🏁'
 }
 

@@ -16,30 +16,30 @@ def test_minimal_window():
         # Test 1: Import de base
         print("1. Import de base...")
         from PySide6.QtWidgets import QApplication
-        print("   ✅ PySide6 OK")
+        print("   PySide6 OK")
         
         # Test 2: Création de l'application Qt
         print("2. Création de l'application Qt...")
         app = QApplication(sys.argv)
-        print("   ✅ Application Qt créée")
+        print("   Application Qt créée")
         
         # Test 3: Test de création de la fenêtre minimale
         print("3. Test de création de la fenêtre minimale...")
         from ui.minimal_window import MinimalWindow
         window = MinimalWindow()
-        print("   ✅ Fenêtre minimale créée")
+        print("   Fenêtre minimale créée")
         
         # Test 4: Affichage de la fenêtre
         print("4. Test d'affichage...")
         window.show()
-        print("   ✅ Fenêtre affichée")
+        print("   Fenêtre affichée")
         
         app.quit()
-        print("🎉 Test de la fenêtre minimale réussi !")
+        print("Test de la fenêtre minimale réussi !")
         return True
         
     except Exception as e:
-        print(f"❌ Erreur: {e}")
+        print(f"Erreur: {e}")
         import traceback
         traceback.print_exc()
         return False

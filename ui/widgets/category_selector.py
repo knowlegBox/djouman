@@ -32,7 +32,7 @@ class CategorySelectorWidget(QWidget):
         layout.addWidget(self.combo)
         
         # Bouton pour ajouter une catégorie
-        self.add_btn = QPushButton("➕")
+        self.add_btn = QPushButton("")
         self.add_btn.setToolTip("Ajouter une catégorie")
         self.add_btn.clicked.connect(self.add_category_requested)
         layout.addWidget(self.add_btn)
@@ -50,7 +50,7 @@ class CategorySelectorWidget(QWidget):
         self.combo.addItem("Aucune catégorie", None)
         
         for category in self.categories:
-            icon = ICON_MAPPING.get(category.icon, "📁")
+            icon = ICON_MAPPING.get(category.icon, "")
             text = f"{icon} {category.name}"
             self.combo.addItem(text, category.id)
     

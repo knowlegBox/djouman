@@ -66,7 +66,7 @@ class SettingsTab(QWidget):
         # Bouton Sauvegarder
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        self.save_btn = QPushButton("💾 Sauvegarder les paramètres")
+        self.save_btn = QPushButton("Sauvegarder les paramètres")
         self.save_btn.clicked.connect(self.save_settings)
         btn_layout.addWidget(self.save_btn)
         

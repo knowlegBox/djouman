@@ -31,7 +31,7 @@ def format_status(status: str) -> str:
 
 def get_icon(icon_name: str) -> str:
     """Retourne l'icône correspondante"""
-    return ICON_MAPPING.get(icon_name, "📝")
+    return ICON_MAPPING.get(icon_name, "")
 
 
 def format_date(date: datetime) -> str:

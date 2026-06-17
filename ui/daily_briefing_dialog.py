@@ -62,7 +62,7 @@ class DailyBriefingDialog(QDialog):
         header_layout = QVBoxLayout()
         header_layout.setSpacing(10)
         
-        title = QLabel("Bonjour ! 🌞")
+        title = QLabel("Bonjour ! ")
         title.setFont(QFont("Segoe UI", 28, QFont.Bold))
         title.setStyleSheet("color: #CDD6F4;")
         title.setAlignment(Qt.AlignCenter)

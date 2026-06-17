@@ -35,10 +35,10 @@ def initialize_database():
     try:
         db_service = DatabaseService()
         db_service.create_tables()
-        print("✅ Base de données initialisée avec succès")
+        print("Base de données initialisée avec succès")
         return db_service
     except Exception as e:
-        print(f"❌ Erreur lors de l'initialisation de la base de données : {e}")
+        print(f"Erreur lors de l'initialisation de la base de données : {e}")
         raise
 
 
@@ -47,11 +47,11 @@ def create_default_categories(category_service):
     try:
         existing_categories = category_service.get_all_categories()
         if not existing_categories:
-            print("📁 Création des catégories par défaut...")
+            print("Création des catégories par défaut...")
             default_categories = category_service.get_default_categories()
-            print(f"✅ {len(default_categories)} catégories créées")
+            print(f"{len(default_categories)} catégories créées")
         else:
-            print(f"📁 {len(existing_categories)} catégories existantes trouvées")
+            print(f"{len(existing_categories)} catégories existantes trouvées")
     except Exception as e:
         print(f"⚠️ Erreur lors de la création des catégories : {e}")
 
@@ -74,12 +74,12 @@ def main():
     parser.add_argument("--startup", action="store_true", help="Launch in startup mode (Daily Briefing)")
     args = parser.parse_args()
 
-    print("🚀 Démarrage de Todo List Manager...")
+    print("Démarrage de Todo List Manager...")
     
     try:
         # Configuration de l'application Qt
         app = setup_application()
-        print("✅ Application Qt configurée")
+        print("Application Qt configurée")
         
         # Initialisation de la base de données
         db_service = initialize_database()
@@ -88,7 +88,7 @@ def main():
         category_service = CategoryService(db_service)
         from services.task_service import TaskService
         task_service = TaskService(db_service)
-        print("✅ Services créés")
+        print("Services créés")
         
         # Création des catégories par défaut
         create_default_categories(category_service)
@@ -102,7 +102,7 @@ def main():
             # Fonction pour ouvrir la fenêtre principale si l'utilisateur clique sur "Ouvrir Djuma"
             def open_main_window():
                 global main_window_instance
-                print("🖥️ Création de l'interface utilisateur principale...")
+                print("Création de l'interface utilisateur principale...")
                 main_window_instance = MainWindow()
                 main_window_instance.show()
                 
@@ -112,28 +112,28 @@ def main():
             briefing_dialog.show()
         else:
             # Création de la fenêtre principale normale
-            print("🖥️ Création de l'interface utilisateur...")
+            print("Création de l'interface utilisateur...")
             global main_window_instance
             main_window_instance = MainWindow()
             main_window_instance.show()
-            print("✅ Interface utilisateur créée et affichée")
+            print("Interface utilisateur créée et affichée")
         
         # Message de démarrage réussi
-        print("🎉 Application démarrée avec succès !")
-        print("📝 Vous pouvez maintenant créer et gérer vos tâches")
+        print("Application démarrée avec succès !")
+        print("Vous pouvez maintenant créer et gérer vos tâches")
         
         # Lancement de la boucle d'événements
         return app.exec()
         
     except ImportError as e:
         error_msg = f"Module manquant : {e}\n\nVeuillez installer les dépendances avec :\npip install -r requirements.txt"
-        print(f"❌ {error_msg}")
+        print(f"{error_msg}")
         show_error_dialog("Erreur d'import", error_msg)
         return 1
         
     except Exception as e:
         error_msg = f"Erreur inattendue : {str(e)}\n\nVérifiez que tous les fichiers sont présents et que les dépendances sont installées."
-        print(f"❌ {error_msg}")
+        print(f"{error_msg}")
         import traceback
         traceback.print_exc()
         show_error_dialog("Erreur de démarrage", error_msg)

@@ -94,8 +94,8 @@ class TaskDialog(QDialog):
         # Boutons
         button_layout = QHBoxLayout()
         
-        self.save_btn = QPushButton("💾 Enregistrer")
-        self.cancel_btn = QPushButton("❌ Annuler")
+        self.save_btn = QPushButton("Enregistrer")
+        self.cancel_btn = QPushButton("Annuler")
         
         button_layout.addStretch()
         button_layout.addWidget(self.save_btn)

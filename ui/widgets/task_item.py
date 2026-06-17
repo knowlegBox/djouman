@@ -39,10 +39,10 @@ class TaskItemWidget(QWidget):
         # Détails
         details = []
         if self.task.category:
-            details.append(f"📁 {self.task.category.name}")
-        details.append(f"⭐ {format_priority(self.task.priority)}")
+            details.append(f"{self.task.category.name}")
+        details.append(f"{format_priority(self.task.priority)}")
         if self.task.duration:
-            details.append(f"⏱️ {format_duration(self.task.duration)}")
+            details.append(f"{format_duration(self.task.duration)}")
         
         if details:
             self.details_label = QLabel(" • ".join(details))
@@ -68,9 +68,9 @@ class TaskItemWidget(QWidget):
     def get_status_icon(self):
         """Retourne l'icône correspondant au statut"""
         icons = {
-            'pending': '⏳',
-            'in_progress': '🔄',
-            'completed': '✅',
-            'cancelled': '❌'
+            'pending': '',
+            'in_progress': '',
+            'completed': '',
+            'cancelled': ''
         }
-        return icons.get(self.task.status, '❓')
+        return icons.get(self.task.status, '')

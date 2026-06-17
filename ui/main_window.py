@@ -78,8 +78,8 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QStackedWidget
         self.stacked_widget = QStackedWidget()
         
-        self.nav_tasks_btn = QPushButton("📝 Dashboard & Tâches")
-        self.nav_settings_btn = QPushButton("⚙️ Paramètres")
+        self.nav_tasks_btn = QPushButton("Dashboard & Tâches")
+        self.nav_settings_btn = QPushButton("Paramètres")
         
         self.nav_tasks_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
         self.nav_settings_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
@@ -90,9 +90,9 @@ class MainWindow(QMainWindow):
         sidebar_layout.addSpacing(20)
         
         # Action Buttons in Sidebar
-        self.add_task_btn = QPushButton("➕ Nouvelle tâche")
+        self.add_task_btn = QPushButton("Nouvelle tâche")
         self.add_task_btn.setObjectName("primary_btn")
-        self.add_category_btn = QPushButton("📁 Nouvelle catégorie")
+        self.add_category_btn = QPushButton("Nouvelle catégorie")
         self.add_category_btn.setObjectName("secondary_btn")
         
         sidebar_layout.addWidget(self.add_task_btn)
@@ -135,15 +135,15 @@ class MainWindow(QMainWindow):
         
         # Toggle Vue
         self.view_toggle_layout = QHBoxLayout()
-        self.view_grid_btn = QPushButton("🗂️ Cartes")
-        self.view_list_btn = QPushButton("📄 Liste")
+        self.view_grid_btn = QPushButton("Cartes")
+        self.view_list_btn = QPushButton("Liste")
         self.view_grid_btn.setObjectName("secondary_btn")
         self.view_list_btn.setObjectName("secondary_btn")
         self.view_toggle_layout.addWidget(self.view_grid_btn)
         self.view_toggle_layout.addWidget(self.view_list_btn)
         topbar_layout.addLayout(self.view_toggle_layout)
         
-        self.refresh_btn = QPushButton("🔄 Actualiser")
+        self.refresh_btn = QPushButton("Actualiser")
         topbar_layout.addWidget(self.refresh_btn)
         
         right_layout.addWidget(topbar)
@@ -512,27 +512,27 @@ class MainWindow(QMainWindow):
         
         if len(tasks) == 1:
             task = tasks[0]
-            edit_action = QAction("✏️ Modifier", self)
+            edit_action = QAction("Modifier", self)
             edit_action.triggered.connect(lambda checked=False, t=task: self.edit_task(t))
             menu.addAction(edit_action)
             
-            status_menu = menu.addMenu("🔄 Changer le statut")
+            status_menu = menu.addMenu("Changer le statut")
             for status_value, status_label in [('pending', 'En attente'), ('in_progress', 'En cours'), ('completed', 'Terminée'), ('cancelled', 'Annulée')]:
                 action = QAction(status_label, self)
                 action.triggered.connect(lambda checked=False, t=task, s=status_value: self.change_task_status(t, s))
                 status_menu.addAction(action)
                 
-            delete_action = QAction("🗑️ Supprimer", self)
+            delete_action = QAction("Supprimer", self)
             delete_action.triggered.connect(lambda checked=False, t=task: self.delete_task(t))
             menu.addAction(delete_action)
         else:
-            status_menu = menu.addMenu(f"🔄 Changer le statut ({len(tasks)} tâches)")
+            status_menu = menu.addMenu(f"Changer le statut ({len(tasks)} tâches)")
             for status_value, status_label in [('pending', 'En attente'), ('in_progress', 'En cours'), ('completed', 'Terminée'), ('cancelled', 'Annulée')]:
                 action = QAction(status_label, self)
                 action.triggered.connect(lambda checked=False, ts=tasks, s=status_value: self.change_tasks_status(ts, s))
                 status_menu.addAction(action)
                 
-            delete_action = QAction(f"🗑️ Supprimer les {len(tasks)} tâches", self)
+            delete_action = QAction(f"Supprimer les {len(tasks)} tâches", self)
             delete_action.triggered.connect(lambda checked=False, ts=tasks: self.delete_tasks(ts))
             menu.addAction(delete_action)
             

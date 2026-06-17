@@ -28,7 +28,7 @@ class TaskListWidget(QWidget):
         
         # En-tête
         header_layout = QHBoxLayout()
-        self.title_label = QLabel("📋 Mes Tâches")
+        self.title_label = QLabel("Mes Tâches")
         self.title_label.setFont(QFont("Arial", 16, QFont.Bold))
         header_layout.addWidget(self.title_label)
         header_layout.addStretch()
@@ -98,16 +98,16 @@ class TaskListWidget(QWidget):
         
         menu = QMenu(self)
         
-        edit_action = QAction("✏️ Modifier", self)
+        edit_action = QAction("Modifier", self)
         edit_action.triggered.connect(lambda: self.task_edit_requested.emit(task))
         menu.addAction(edit_action)
         
         if task.status != 'completed':
-            complete_action = QAction("✅ Terminer", self)
+            complete_action = QAction("Terminer", self)
             complete_action.triggered.connect(lambda: self.task_complete_requested.emit(task))
             menu.addAction(complete_action)
         
-        delete_action = QAction("🗑️ Supprimer", self)
+        delete_action = QAction("Supprimer", self)
         delete_action.triggered.connect(lambda: self.task_delete_requested.emit(task))
         menu.addAction(delete_action)
         
