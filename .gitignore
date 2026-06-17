@@ -150,3 +150,4 @@ dmypy.json
 # Fichiers système
 .DS_Store
 Thumbs.db
+design/

@@ -18,6 +18,15 @@ class SettingsTab(QWidget):
     def setup_ui(self):
         layout = QVBoxLayout(self)
         
+        # Groupe Apparence
+        app_group = QGroupBox("Apparence")
+        app_layout = QFormLayout(app_group)
+        
+        self.theme_combo = QComboBox()
+        self.theme_combo.addItem("Mode Sombre (Djuma)", "dark")
+        self.theme_combo.addItem("Mode Clair", "light")
+        app_layout.addRow("Thème visuel:", self.theme_combo)
+
         # Groupe Notifications
         notif_group = QGroupBox("Notifications & Rappels")
         notif_layout = QFormLayout(notif_group)
@@ -49,22 +58,10 @@ class SettingsTab(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         self.save_btn = QPushButton("💾 Sauvegarder les paramètres")
-        self.save_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #3498db;
-                color: white;
-                border: none;
-                padding: 8px 15px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #2980b9;
-            }
-        """)
         self.save_btn.clicked.connect(self.save_settings)
         btn_layout.addWidget(self.save_btn)
         
+        layout.addWidget(app_group)
         layout.addWidget(notif_group)
         layout.addWidget(task_group)
         layout.addLayout(btn_layout)
@@ -84,6 +81,11 @@ class SettingsTab(QWidget):
         idx = self.duration_combo.findData(dur_val)
         if idx >= 0:
             self.duration_combo.setCurrentIndex(idx)
+            
+        theme_val = self.settings_service.get("theme", "dark")
+        idx = self.theme_combo.findData(theme_val)
+        if idx >= 0:
+            self.theme_combo.setCurrentIndex(idx)
 
     def save_settings(self):
         """Sauvegarde les paramètres et notifie l'application"""
@@ -91,6 +93,7 @@ class SettingsTab(QWidget):
         self.settings_service.set("hide_completed_tasks", self.hide_completed_cb.isChecked())
         self.settings_service.set("snooze_delay_minutes", self.snooze_combo.currentData())
         self.settings_service.set("default_duration_minutes", self.duration_combo.currentData())
+        self.settings_service.set("theme", self.theme_combo.currentData())
         
         QMessageBox.information(self, "Succès", "Les paramètres ont été sauvegardés.")
         self.settings_changed.emit()
