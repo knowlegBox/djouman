@@ -5,7 +5,7 @@ PySide6_Essentials>=6.8.0.2
 shiboken6>=6.8.0.2
 
 # Base de données
-SQLAlchemy>=2.0.23
+SQLAlchemy>=2.0.36
 
 # Utilitaires
 python-dateutil>=2.8.2
