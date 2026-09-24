@@ -352,6 +352,7 @@ class MainWindow(QMainWindow):
         search_text = self.search_input.text().lower()
         status_text = self.status_filter.currentText()
         category_text = self.category_filter.currentText()
+        today = datetime.now().date()
         
         all_tasks = self.task_service.get_all_tasks()
         filtered_tasks = []
@@ -359,6 +360,15 @@ class MainWindow(QMainWindow):
         hide_completed = getattr(self, 'settings_service', None) and self.settings_service.get("hide_completed_tasks", False)
         
         for task in all_tasks:
+            # La vue par défaut rassemble les tâches du jour et les tâches non terminées.
+            if status_text == "Tous":
+                is_today = any(
+                    task_date and task_date.date() == today
+                    for task_date in (task.start_date, task.end_date)
+                )
+                if task.status == 'completed' and not is_today:
+                    continue
+
             # Masquer les tâches terminées par défaut si le paramètre est actif
             if status_text == "Tous" and hide_completed and task.status == 'completed':
                 continue

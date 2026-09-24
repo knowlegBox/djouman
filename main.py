@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt
 from ui.main_window import MainWindow
 from services import DatabaseService, CategoryService
 from config.settings import DEFAULT_STYLES
+from utils.startup import register_startup
 
 
 def setup_application():
@@ -72,6 +73,8 @@ def main():
     print("🚀 Démarrage de Todo List Manager...")
     
     try:
+        register_startup()
+
         # Configuration de l'application Qt
         app = setup_application()
         print("✅ Application Qt configurée")
