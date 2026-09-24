@@ -4,17 +4,21 @@ Fenêtre principale de l'application Todo List
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                                QPushButton, QLineEdit, QComboBox, QTableView, 
                                QLabel, QGroupBox, QSplitter, QHeaderView,
-                               QMessageBox, QMenu)
+                               QMessageBox, QMenu, QTabWidget)
 from PySide6.QtGui import QAction
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QIcon, QFont, QColor
-from services import DatabaseService, TaskService, CategoryService
+from datetime import datetime, timedelta
+from services import DatabaseService, TaskService, CategoryService, SettingsService
 from models import Task, Category
 from utils import format_duration, format_priority, format_status, get_priority_color, get_status_color
 from config.settings import WINDOW_TITLE, WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT, DEFAULT_STYLES
 from ui.models.task_table_model import TaskTableModel
 from ui.task_dialog import TaskDialog
 from ui.category_dialog import CategoryDialog
+from ui.widgets.screen_blocker import TaskScreenBlocker
+from ui.widgets.settings_tab import SettingsTab
+from ui.widgets.task_card import TaskCard
 
 
 class MainWindow(QMainWindow):
@@ -22,6 +26,7 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        self.settings_service = SettingsService()
         self.db_service = DatabaseService()
         self.task_service = TaskService(self.db_service)
         self.category_service = CategoryService(self.db_service)
@@ -30,6 +35,13 @@ class MainWindow(QMainWindow):
         self.load_data()
         self.setup_connections()
         self.apply_styles()
+        
+        # Initialisation du système de notification
+        self.notified_tasks = {}
+        self.active_blockers = []
+        self.notification_timer = QTimer(self)
+        self.notification_timer.timeout.connect(self.check_due_tasks)
+        self.notification_timer.start(10000)  # Toutes les 10 secondes
     
     def setup_ui(self):
         """Configure l'interface utilisateur"""
@@ -40,68 +52,152 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Layout principal
-        main_layout = QVBoxLayout(central_widget)
+        # Layout principal horizontal (Sidebar + Contenu)
+        main_layout = QHBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         
-        # Barre d'outils
-        toolbar_layout = QHBoxLayout()
+        # --- Sidebar ---
+        self.sidebar = QWidget()
+        self.sidebar.setFixedWidth(250)
+        self.sidebar.setObjectName("sidebar")
+        sidebar_layout = QVBoxLayout(self.sidebar)
+        sidebar_layout.setContentsMargins(15, 20, 15, 20)
+        sidebar_layout.setSpacing(10)
         
-        # Boutons d'action
+        # Titre Sidebar
+        app_title = QLabel("Djuma")
+        app_title.setFont(QFont("Inter", 24, QFont.Bold))
+        app_title.setObjectName("app_title")
+        app_title.setAlignment(Qt.AlignCenter)
+        sidebar_layout.addWidget(app_title)
+        
+        sidebar_layout.addSpacing(20)
+        
+        # Boutons de navigation
+        from PySide6.QtWidgets import QStackedWidget
+        self.stacked_widget = QStackedWidget()
+        
+        self.nav_tasks_btn = QPushButton("📝 Dashboard & Tâches")
+        self.nav_settings_btn = QPushButton("⚙️ Paramètres")
+        
+        self.nav_tasks_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
+        self.nav_settings_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
+        
+        sidebar_layout.addWidget(self.nav_tasks_btn)
+        sidebar_layout.addWidget(self.nav_settings_btn)
+        
+        sidebar_layout.addSpacing(20)
+        
+        # Action Buttons in Sidebar
         self.add_task_btn = QPushButton("➕ Nouvelle tâche")
+        self.add_task_btn.setObjectName("primary_btn")
         self.add_category_btn = QPushButton("📁 Nouvelle catégorie")
-        self.refresh_btn = QPushButton("🔄 Actualiser")
+        self.add_category_btn.setObjectName("secondary_btn")
         
-        toolbar_layout.addWidget(self.add_task_btn)
-        toolbar_layout.addWidget(self.add_category_btn)
-        toolbar_layout.addWidget(self.refresh_btn)
-        toolbar_layout.addStretch()
+        sidebar_layout.addWidget(self.add_task_btn)
+        sidebar_layout.addWidget(self.add_category_btn)
         
-        # Barre de recherche et filtres
-        search_layout = QHBoxLayout()
+        sidebar_layout.addStretch()
+        
+        main_layout.addWidget(self.sidebar)
+        
+        # --- Right Content Area ---
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Top Bar
+        topbar = QWidget()
+        topbar.setFixedHeight(60)
+        topbar.setObjectName("topbar")
+        topbar_layout = QHBoxLayout(topbar)
         
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Rechercher une tâche...")
+        self.search_input.setFixedWidth(300)
         
+        topbar_layout.addWidget(QLabel("Recherche:"))
+        topbar_layout.addWidget(self.search_input)
+        topbar_layout.addStretch()
+        
+        # Filtres (déplacés dans la top bar pour le moment)
         self.status_filter = QComboBox()
         self.status_filter.addItems(["Tous", "En attente", "En cours", "Terminée", "Annulée"])
-        
         self.category_filter = QComboBox()
         self.category_filter.addItems(["Toutes les catégories"])
         
-        search_layout.addWidget(QLabel("Recherche:"))
-        search_layout.addWidget(self.search_input)
-        search_layout.addWidget(QLabel("Statut:"))
-        search_layout.addWidget(self.status_filter)
-        search_layout.addWidget(QLabel("Catégorie:"))
-        search_layout.addWidget(self.category_filter)
+        topbar_layout.addWidget(QLabel("Statut:"))
+        topbar_layout.addWidget(self.status_filter)
+        topbar_layout.addWidget(QLabel("Catégorie:"))
+        topbar_layout.addWidget(self.category_filter)
         
-        # Zone de contenu principal
+        
+        # Toggle Vue
+        self.view_toggle_layout = QHBoxLayout()
+        self.view_grid_btn = QPushButton("🗂️ Cartes")
+        self.view_list_btn = QPushButton("📄 Liste")
+        self.view_grid_btn.setObjectName("secondary_btn")
+        self.view_list_btn.setObjectName("secondary_btn")
+        self.view_toggle_layout.addWidget(self.view_grid_btn)
+        self.view_toggle_layout.addWidget(self.view_list_btn)
+        topbar_layout.addLayout(self.view_toggle_layout)
+        
+        self.refresh_btn = QPushButton("🔄 Actualiser")
+        topbar_layout.addWidget(self.refresh_btn)
+        
+        right_layout.addWidget(topbar)
+        right_layout.addWidget(self.stacked_widget)
+        
+        main_layout.addWidget(right_widget)
+        
+        # --- View 0: Tâches ---
+        tasks_view = QWidget()
+        tasks_layout = QVBoxLayout(tasks_view)
+        
+        from PySide6.QtWidgets import QStackedWidget, QScrollArea, QGridLayout
+        
+        self.task_view_stack = QStackedWidget()
+        
+        # --- Page 0: Grid View (Cartes) ---
+        self.grid_scroll = QScrollArea()
+        self.grid_scroll.setWidgetResizable(True)
+        self.grid_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.grid_scroll.setObjectName("gridScroll")
+        self.grid_scroll.setStyleSheet("QScrollArea#gridScroll { border: none; background-color: transparent; }")
+        
+        self.grid_widget = QWidget()
+        self.grid_widget.setObjectName("gridWidget")
+        from PySide6.QtWidgets import QSizePolicy
+        self.grid_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.grid_widget.setStyleSheet("QWidget#gridWidget { background-color: transparent; }")
+        self.grid_layout = QGridLayout(self.grid_widget)
+        # self.grid_layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.grid_layout.setSpacing(15)
+        
+        self.grid_scroll.setWidget(self.grid_widget)
+        self.task_view_stack.addWidget(self.grid_scroll)
+        
+        # --- Page 1: List View (Tableau) + Details ---
         content_splitter = QSplitter(Qt.Horizontal)
         
-        # Table des tâches
         self.task_table = QTableView()
         self.task_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.task_table.setSelectionBehavior(QTableView.SelectRows)
         self.task_table.setAlternatingRowColors(True)
         self.task_table.setSortingEnabled(True)
         
-        # Panneau de détails
         details_widget = QWidget()
         details_layout = QVBoxLayout(details_widget)
-        
         self.task_title = QLabel("Sélectionnez une tâche")
-        self.task_title.setFont(QFont("Arial", 14, QFont.Bold))
-        
+        self.task_title.setFont(QFont("Inter", 14, QFont.Bold))
         self.task_description = QLabel("")
         self.task_description.setWordWrap(True)
-        
         self.task_details = QLabel("")
-        
         details_layout.addWidget(self.task_title)
         details_layout.addWidget(self.task_description)
         details_layout.addWidget(self.task_details)
         
-        # Graphe de statistiques
         try:
             from PySide6.QtCharts import QChartView
             from PySide6.QtGui import QPainter
@@ -111,24 +207,38 @@ class MainWindow(QMainWindow):
             details_layout.addWidget(self.chart_view)
         except ImportError:
             self.chart_view = None
-            print("QtCharts non disponible")
             
-        details_layout.addStretch()
         
+        # Configuration des vues (Cartes par défaut)
+        self.task_view_stack.setCurrentIndex(0)
+        details_layout.addStretch()
         content_splitter.addWidget(self.task_table)
         content_splitter.addWidget(details_widget)
         content_splitter.setSizes([600, 300])
         
-        # Ajout des éléments au layout principal
-        main_layout.addLayout(toolbar_layout)
-        main_layout.addLayout(search_layout)
-        main_layout.addWidget(content_splitter)
+        self.task_view_stack.addWidget(content_splitter)
+        
+        tasks_layout.addWidget(self.task_view_stack)
+        self.stacked_widget.addWidget(tasks_view)
+        
+        # --- View 1: Paramètres ---
+        self.settings_tab = SettingsTab(self.settings_service)
+        self.settings_tab.settings_changed.connect(self.on_settings_changed)
+        self.stacked_widget.addWidget(self.settings_tab)
+        
+    def on_settings_changed(self):
+        """Callback quand les paramètres sont modifiés"""
+        self.apply_styles()
+        self.load_data()  # Recharger les tâches si hide_completed_tasks a changé
+        self.filter_tasks()
     
     def setup_connections(self):
         """Configure les connexions des signaux"""
         self.add_task_btn.clicked.connect(self.add_task)
         self.add_category_btn.clicked.connect(self.add_category)
         self.refresh_btn.clicked.connect(self.load_data)
+        self.view_grid_btn.clicked.connect(lambda: self.task_view_stack.setCurrentIndex(0))
+        self.view_list_btn.clicked.connect(lambda: self.task_view_stack.setCurrentIndex(1))
         
         self.search_input.textChanged.connect(self.filter_tasks)
         self.status_filter.currentTextChanged.connect(self.filter_tasks)
@@ -139,14 +249,28 @@ class MainWindow(QMainWindow):
         self.task_table.doubleClicked.connect(self.edit_task_by_index)
     
     def apply_styles(self):
-        """Applique les styles CSS"""
-        self.setStyleSheet(DEFAULT_STYLES)
-    
+        """Applique les styles CSS basés sur le thème sélectionné"""
+        from config.settings import DARK_THEME, LIGHT_THEME
+        theme = self.settings_service.get("theme", "dark")
+        
+        if theme == "light":
+            self.setStyleSheet(LIGHT_THEME)
+        else:
+            self.setStyleSheet(DARK_THEME)
+            
+        # Additional dynamic styling based on theme
+        if theme == "dark":
+            self.sidebar.setStyleSheet("QWidget#sidebar { background-color: #1a211d; border-right: 1px solid #3c4a42; } QLabel#app_title { color: #4edea3; }")
+            self.findChild(QWidget, "topbar").setStyleSheet("QWidget#topbar { background-color: #0e1511; border-bottom: 1px solid #3c4a42; }")
+        else:
+            self.sidebar.setStyleSheet("QWidget#sidebar { background-color: #e9ecef; border-right: 1px solid #dee2e6; } QLabel#app_title { color: #007bff; }")
+            self.findChild(QWidget, "topbar").setStyleSheet("QWidget#topbar { background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; }")
+            
     def load_data(self):
         """Charge les données"""
         self.load_tasks()
         self.load_categories()
-        self.update_chart()
+        self.filter_tasks()
     
     def load_tasks(self):
         """Charge la liste des tâches"""
@@ -180,16 +304,23 @@ class MainWindow(QMainWindow):
     
     def add_task(self):
         """Ouvre le dialogue d'ajout de tâche"""
-        dialog = TaskDialog(self.task_service, self.category_service)
+        dialog = TaskDialog(self.task_service, self.category_service, settings_service=self.settings_service, parent=self)
         if dialog.exec() == TaskDialog.Accepted:
             self.load_tasks()
+            self.update_chart()
     
     def add_category(self):
         """Ouvre le dialogue d'ajout de catégorie"""
-        dialog = CategoryDialog(self.category_service)
+        dialog = CategoryDialog(self.category_service, self)
         if dialog.exec() == CategoryDialog.Accepted:
             self.load_categories()
     
+    def edit_task_from_card(self, task):
+        """Ouvre la boîte de dialogue pour éditer une tâche depuis la vue carte"""
+        dialog = TaskDialog(self.task_service, self.category_service, task, self.settings_service, self)
+        if dialog.exec():
+            self.load_data()
+
     def show_task_details(self, selection):
         """Affiche les détails de la tâche sélectionnée"""
         if not selection.indexes():
@@ -209,8 +340,10 @@ class MainWindow(QMainWindow):
                 details.append(f"Durée: {format_duration(task.duration)}")
             if task.category:
                 details.append(f"Catégorie: {task.category.name}")
-            if task.due_date:
-                details.append(f"Échéance: {task.due_date.strftime('%d/%m/%Y %H:%M')}")
+            if task.start_date:
+                details.append(f"Début: {task.start_date.strftime('%d/%m/%Y %H:%M')}")
+            if task.end_date:
+                details.append(f"Fin: {task.end_date.strftime('%d/%m/%Y %H:%M')}")
             
             self.task_details.setText("\n".join(details))
     
@@ -219,11 +352,27 @@ class MainWindow(QMainWindow):
         search_text = self.search_input.text().lower()
         status_text = self.status_filter.currentText()
         category_text = self.category_filter.currentText()
+        today = datetime.now().date()
         
         all_tasks = self.task_service.get_all_tasks()
         filtered_tasks = []
         
+        hide_completed = getattr(self, 'settings_service', None) and self.settings_service.get("hide_completed_tasks", False)
+        
         for task in all_tasks:
+            # La vue par défaut rassemble les tâches du jour et les tâches non terminées.
+            if status_text == "Tous":
+                is_today = any(
+                    task_date and task_date.date() == today
+                    for task_date in (task.start_date, task.end_date)
+                )
+                if task.status == 'completed' and not is_today:
+                    continue
+
+            # Masquer les tâches terminées par défaut si le paramètre est actif
+            if status_text == "Tous" and hide_completed and task.status == 'completed':
+                continue
+                
             # Filtre de recherche texte (titre ou description)
             match_search = True
             if search_text:
@@ -251,6 +400,26 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'task_model'):
             self.task_model.set_tasks(filtered_tasks)
             self.update_chart()
+            
+        # Mettre à jour la vue Grille
+        if hasattr(self, 'grid_layout'):
+            # Vider la grille
+            while self.grid_layout.count():
+                item = self.grid_layout.takeAt(0)
+                widget = item.widget()
+                if widget:
+                    widget.deleteLater()
+                    
+            # Remplir la grille
+            # La réorganisation se fera par reflow_grid
+            for task in filtered_tasks:
+                card = TaskCard(task, self.grid_widget)
+                card.double_clicked.connect(self.edit_task_from_card)
+                card.clicked.connect(self.edit_task_from_card) 
+                self.grid_layout.addWidget(card, 0, 0) # Sera réorganisé par reflow_grid
+                card.show()
+                
+            self.reflow_grid()
             
     def update_chart(self):
         """Met à jour le graphique des statistiques"""
@@ -298,37 +467,91 @@ class MainWindow(QMainWindow):
             self.chart_view.setChart(chart)
         except Exception as e:
             print(f"Erreur lors de la mise à jour du graphique: {e}")
+            
+    def check_due_tasks(self):
+        """Vérifie si une tâche a dépassé son échéance et affiche l'écran noir si nécessaire"""
+        if not hasattr(self, 'task_model'):
+            return
+            
+        if not self.settings_service.get("enable_screen_blocker", True):
+            return
+            
+        import datetime
+        now = datetime.datetime.now()
+        
+        for task in self.task_service.get_all_tasks():
+            if task.status in ['pending', 'in_progress'] and task.start_date:
+                if now >= task.start_date:
+                    should_notify = False
+                    
+                    if task.id not in self.notified_tasks:
+                        should_notify = True
+                    else:
+                        last_notified = self.notified_tasks[task.id]
+                        # Snooze basé sur les paramètres
+                        if now >= last_notified + datetime.timedelta(minutes=5):
+                            should_notify = True
+                            
+                    if should_notify:
+                        # Ne pas afficher si un écran pour cette tâche est déjà visible
+                        already_shown = any(hasattr(b, 'task') and b.task.id == task.id for b in self.active_blockers)
+                        if not already_shown:
+                            self.show_task_blocker(task)
+                            
+    def show_task_blocker(self, task):
+        """Affiche l'écran noir pour une tâche"""
+        blocker = TaskScreenBlocker(task, self.on_blocker_dismissed)
+        self.active_blockers.append(blocker)
+        blocker.showFullScreen()
+        
+    def on_blocker_dismissed(self, task_id):
+        """Callback appelé quand l'utilisateur clique sur Quitter"""
+        self.notified_tasks[task_id] = datetime.now()
     
     def show_context_menu(self, position):
         """Affiche le menu contextuel"""
-        index = self.task_table.indexAt(position)
-        if not index.isValid():
+        indexes = self.task_table.selectionModel().selectedRows()
+        if not indexes:
             return
-        
-        task = self.task_model.get_task(index.row())
-        if not task:
+            
+        tasks = [self.task_model.get_task(idx.row()) for idx in indexes if self.task_model.get_task(idx.row())]
+        if not tasks:
             return
-        
+            
         menu = QMenu(self)
         
-        edit_action = QAction("✏️ Modifier", self)
-        edit_action.triggered.connect(lambda: self.edit_task(task))
-        menu.addAction(edit_action)
-        
-        complete_action = QAction("✅ Terminer", self)
-        complete_action.triggered.connect(lambda: self.complete_task(task))
-        menu.addAction(complete_action)
-        
-        delete_action = QAction("🗑️ Supprimer", self)
-        delete_action.triggered.connect(lambda: self.delete_task(task))
-        menu.addAction(delete_action)
-        
+        if len(tasks) == 1:
+            task = tasks[0]
+            edit_action = QAction("✏️ Modifier", self)
+            edit_action.triggered.connect(lambda checked=False, t=task: self.edit_task(t))
+            menu.addAction(edit_action)
+            
+            status_menu = menu.addMenu("🔄 Changer le statut")
+            for status_value, status_label in [('pending', 'En attente'), ('in_progress', 'En cours'), ('completed', 'Terminée'), ('cancelled', 'Annulée')]:
+                action = QAction(status_label, self)
+                action.triggered.connect(lambda checked=False, t=task, s=status_value: self.change_task_status(t, s))
+                status_menu.addAction(action)
+                
+            delete_action = QAction("🗑️ Supprimer", self)
+            delete_action.triggered.connect(lambda checked=False, t=task: self.delete_task(t))
+            menu.addAction(delete_action)
+        else:
+            status_menu = menu.addMenu(f"🔄 Changer le statut ({len(tasks)} tâches)")
+            for status_value, status_label in [('pending', 'En attente'), ('in_progress', 'En cours'), ('completed', 'Terminée'), ('cancelled', 'Annulée')]:
+                action = QAction(status_label, self)
+                action.triggered.connect(lambda checked=False, ts=tasks, s=status_value: self.change_tasks_status(ts, s))
+                status_menu.addAction(action)
+                
+            delete_action = QAction(f"🗑️ Supprimer les {len(tasks)} tâches", self)
+            delete_action.triggered.connect(lambda checked=False, ts=tasks: self.delete_tasks(ts))
+            menu.addAction(delete_action)
+            
         menu.exec(self.task_table.mapToGlobal(position))
     
     def edit_task(self, task):
         """Modifie une tâche"""
         if task:
-            dialog = TaskDialog(self.task_service, self.category_service, task)
+            dialog = TaskDialog(self.task_service, self.category_service, task, self.settings_service, self)
             if dialog.exec() == TaskDialog.Accepted:
                 self.load_tasks()
                 self.filter_tasks() # Réapplique le filtre après édition
@@ -346,6 +569,20 @@ class MainWindow(QMainWindow):
             self.load_tasks()
             self.update_chart()
             QMessageBox.information(self, "Succès", "Tâche marquée comme terminée")
+
+    def change_task_status(self, task, status):
+        """Change le statut d'une tâche"""
+        if self.task_service.update_task(task.id, status=status):
+            self.load_tasks()
+            self.update_chart()
+            
+    def change_tasks_status(self, tasks, status):
+        """Change le statut de plusieurs tâches"""
+        for task in tasks:
+            self.task_service.update_task(task.id, status=status)
+        self.load_tasks()
+        self.update_chart()
+        QMessageBox.information(self, "Succès", f"Statut mis à jour pour {len(tasks)} tâches")
     
     def delete_task(self, task):
         """Supprime une tâche"""
@@ -360,8 +597,59 @@ class MainWindow(QMainWindow):
                 self.load_tasks()
                 self.update_chart()
                 QMessageBox.information(self, "Succès", "Tâche supprimée")
+                
+    def delete_tasks(self, tasks):
+        """Supprime plusieurs tâches"""
+        reply = QMessageBox.question(
+            self, "Confirmation", 
+            f"Êtes-vous sûr de vouloir supprimer ces {len(tasks)} tâches ?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            for task in tasks:
+                self.task_service.delete_task(task.id)
+            self.load_tasks()
+            self.update_chart()
+            QMessageBox.information(self, "Succès", f"{len(tasks)} tâches supprimées")
     
     def closeEvent(self, event):
         """Ferme l'application proprement"""
         self.db_service.close()
         event.accept()
+
+    def resizeEvent(self, event):
+        """Gère le redimensionnement de la fenêtre pour ajuster la grille de cartes"""
+        super().resizeEvent(event)
+        self.reflow_grid()
+        
+    def reflow_grid(self):
+        """Réorganise les cartes dans la grille en fonction de la largeur disponible"""
+        if not hasattr(self, 'grid_layout') or not hasattr(self, 'grid_scroll'):
+            return
+            
+        # Largeur disponible dans la zone de défilement (en tenant compte de la scrollbar verticale)
+        available_width = self.grid_scroll.viewport().width() - 20 
+        
+        # Largeur d'une carte + espacement
+        card_width = 280 + 15
+        
+        # Nombre de colonnes (au moins 1)
+        max_cols = max(1, available_width // card_width)
+        
+        # Récupérer tous les widgets (cartes)
+        widgets = []
+        for i in range(self.grid_layout.count()):
+            item = self.grid_layout.itemAt(i)
+            if item and item.widget():
+                widgets.append(item.widget())
+                
+        # Réorganiser
+        row, col = 0, 0
+        for w in widgets:
+            self.grid_layout.removeWidget(w)
+            self.grid_layout.addWidget(w, row, col)
+            col += 1
+            if col >= max_cols:
+                col = 0
+                row += 1

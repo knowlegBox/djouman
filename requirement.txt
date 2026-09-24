@@ -1,16 +1,16 @@
 # Interface utilisateur
-PySide6==6.8.0.2
-PySide6_Addons==6.8.0.2
-PySide6_Essentials==6.8.0.2
-shiboken6==6.8.0.2
+PySide6>=6.8.0.2
+PySide6_Addons>=6.8.0.2
+PySide6_Essentials>=6.8.0.2
+shiboken6>=6.8.0.2
 
 # Base de données
-SQLAlchemy==2.0.23
+SQLAlchemy>=2.0.36
 
 # Utilitaires
-python-dateutil==2.8.2
+python-dateutil>=2.8.2
 
 # Développement (optionnel)
-pytest==7.4.3
-black==23.9.1
-flake8==6.1.0
+pytest>=7.4.3
+black>=23.9.1
+flake8>=6.1.0

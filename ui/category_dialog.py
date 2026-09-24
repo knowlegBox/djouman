@@ -14,8 +14,8 @@ from config.settings import CATEGORY_COLORS, ICON_MAPPING
 class CategoryDialog(QDialog):
     """Dialogue pour créer ou modifier une catégorie"""
     
-    def __init__(self, category_service: CategoryService, category: Category = None):
-        super().__init__()
+    def __init__(self, category_service: CategoryService, category: Category = None, parent=None):
+        super().__init__(parent)
         self.category_service = category_service
         self.category = category
         
