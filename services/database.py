@@ -5,9 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 from models import Base, Task, Category  # Import des modèles pour enregistrement
-
-# Configuration de la base de données SQLite
-DATABASE_URL = "sqlite:///todo.db"
+from config.settings import DATABASE_URL
 
 # Création du moteur SQLAlchemy
 engine = create_engine(

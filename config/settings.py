@@ -2,6 +2,8 @@
 Configuration de l'application Todo List
 """
 import os
+import sys
+import shutil
 from pathlib import Path
 
 # Chemins de l'application
@@ -9,13 +11,39 @@ APP_DIR = Path(__file__).parent.parent
 ASSETS_DIR = APP_DIR / "assets"
 ICONS_DIR = ASSETS_DIR / "icons"
 
-# Configuration de la base de données
-DATABASE_URL = "sqlite:///todo.db"
+# Emplacement utilisateur sécurisé pour les données (AppData sous Windows)
+if sys.platform == "win32":
+    DATA_DIR = Path(os.environ.get("APPDATA", Path.home())) / "Djuma"
+else:
+    DATA_DIR = Path.home() / ".djuma"
+
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = DATA_DIR / "todo.db"
+SETTINGS_PATH = DATA_DIR / "user_settings.json"
+
+# Migration si un fichier todo.db existait dans le dossier de l'application
+LOCAL_DB = APP_DIR / "todo.db"
+if LOCAL_DB.exists() and not DB_PATH.exists():
+    try:
+        shutil.copy2(LOCAL_DB, DB_PATH)
+    except Exception:
+        pass
+
+# Migration si un fichier user_settings.json existait dans config/
+LOCAL_SETTINGS = APP_DIR / "config" / "user_settings.json"
+if LOCAL_SETTINGS.exists() and not SETTINGS_PATH.exists():
+    try:
+        shutil.copy2(LOCAL_SETTINGS, SETTINGS_PATH)
+    except Exception:
+        pass
+
+# Configuration de la base de données (chemin absolu)
+DATABASE_URL = f"sqlite:///{DB_PATH.as_posix()}"
 
 # Configuration de l'interface
 WINDOW_TITLE = "Todo List Manager"
-WINDOW_MIN_WIDTH = 800
-WINDOW_MIN_HEIGHT = 600
+WINDOW_MIN_WIDTH = 1200
+WINDOW_MIN_HEIGHT = 800
 
 # Configuration des tâches
 DEFAULT_PRIORITY = 1

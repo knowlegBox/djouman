@@ -1,11 +1,16 @@
 import os
 import json
+from pathlib import Path
+from config.settings import SETTINGS_PATH
 
 class SettingsService:
     """Service de gestion des paramètres utilisateur"""
     
-    def __init__(self, config_path="config/user_settings.json"):
-        self.config_path = config_path
+    def __init__(self, config_path=None):
+        if config_path is None:
+            self.config_path = SETTINGS_PATH
+        else:
+            self.config_path = Path(config_path)
         self.default_settings = {
             "enable_screen_blocker": True,
             "snooze_delay_minutes": 5,
@@ -36,8 +41,8 @@ class SettingsService:
         if settings is not None:
             self.settings = settings
             
-        # Créer le dossier config s'il n'existe pas
-        os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
+        # Créer le dossier parent s'il n'existe pas
+        os.makedirs(os.path.dirname(str(self.config_path)), exist_ok=True)
         try:
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 json.dump(self.settings, f, indent=4)
