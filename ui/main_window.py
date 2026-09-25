@@ -9,7 +9,7 @@ from PySide6.QtGui import QAction
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QIcon, QFont, QColor
 from datetime import datetime, timedelta
-from services import DatabaseService, TaskService, ProjectService, SettingsService
+from services import DatabaseService, TaskService, ProjectService, SettingsService, WorkSessionService
 from models import Task, Project
 from utils import format_duration, format_priority, format_status, get_priority_color, get_status_color
 from config.settings import WINDOW_TITLE, WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT, DEFAULT_STYLES
@@ -30,6 +30,7 @@ class MainWindow(QMainWindow):
         self.db_service = DatabaseService()
         self.task_service = TaskService(self.db_service)
         self.project_service = ProjectService(self.db_service)
+        self.work_session_service = WorkSessionService(self.db_service)
         
         self.setup_ui()
         self.load_data()
@@ -78,13 +79,16 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QStackedWidget
         self.stacked_widget = QStackedWidget()
         
-        self.nav_tasks_btn = QPushButton("📝 Dashboard & Tâches")
+        self.nav_tasks_btn = QPushButton("📝 Tâches")
+        self.nav_dashboard_btn = QPushButton("📊 Tableau de bord")
         self.nav_settings_btn = QPushButton("⚙️ Paramètres")
         
         self.nav_tasks_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
         self.nav_settings_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
+        self.nav_dashboard_btn.clicked.connect(lambda: self.switch_to_dashboard())
         
         sidebar_layout.addWidget(self.nav_tasks_btn)
+        sidebar_layout.addWidget(self.nav_dashboard_btn)
         sidebar_layout.addWidget(self.nav_settings_btn)
         
         sidebar_layout.addSpacing(20)
@@ -97,6 +101,18 @@ class MainWindow(QMainWindow):
         
         sidebar_layout.addWidget(self.add_task_btn)
         sidebar_layout.addWidget(self.add_project_btn)
+        
+        sidebar_layout.addSpacing(15)
+        
+        # Section Projets
+        self.sidebar_projects_label = QLabel("PROJETS")
+        self.sidebar_projects_label.setStyleSheet("color: #888; font-weight: bold; font-size: 11px;")
+        sidebar_layout.addWidget(self.sidebar_projects_label)
+        
+        from PySide6.QtWidgets import QListWidget
+        self.projects_list = QListWidget()
+        self.projects_list.setStyleSheet("QListWidget { background: transparent; border: none; } QListWidget::item { padding: 5px; }")
+        sidebar_layout.addWidget(self.projects_list)
         
         sidebar_layout.addStretch()
         
@@ -119,6 +135,13 @@ class MainWindow(QMainWindow):
         
         topbar_layout.addWidget(QLabel("Recherche:"))
         topbar_layout.addWidget(self.search_input)
+        topbar_layout.addStretch()
+        
+        # Timer Widget
+        from ui.widgets.timer_widget import TimerWidget
+        self.timer_widget = TimerWidget(self.work_session_service)
+        topbar_layout.addWidget(self.timer_widget)
+        
         topbar_layout.addStretch()
         
         # Filtres (déplacés dans la top bar pour le moment)
@@ -163,6 +186,7 @@ class MainWindow(QMainWindow):
         from ui.widgets.kanban_board import KanbanBoard
         self.kanban_board = KanbanBoard()
         self.kanban_board.task_clicked.connect(self.edit_task_from_card)
+        self.kanban_board.timer_toggled.connect(self.toggle_task_timer)
         self.task_view_stack.addWidget(self.kanban_board)
         
         # --- Page 1: List View (Tableau) + Details ---
@@ -213,6 +237,13 @@ class MainWindow(QMainWindow):
         self.settings_tab.settings_changed.connect(self.on_settings_changed)
         self.stacked_widget.addWidget(self.settings_tab)
         
+        # --- View 2: Dashboard ---
+        from ui.widgets.dashboard_tab import DashboardTab
+        self.dashboard_tab = DashboardTab(self.task_service, self.project_service, self.work_session_service)
+        self.stacked_widget.addWidget(self.dashboard_tab)
+        
+        self.stacked_widget.setCurrentIndex(0)
+        
     def on_settings_changed(self):
         """Callback quand les paramètres sont modifiés"""
         self.apply_styles()
@@ -258,6 +289,10 @@ class MainWindow(QMainWindow):
         self.load_tasks()
         self.load_projects()
         self.filter_tasks()
+        
+    def switch_to_dashboard(self):
+        self.dashboard_tab.refresh_data()
+        self.stacked_widget.setCurrentIndex(2)
     
     def load_tasks(self):
         """Charge la liste des tâches"""
@@ -284,10 +319,22 @@ class MainWindow(QMainWindow):
         """Charge la liste des projets"""
         self.project_filter.clear()
         self.project_filter.addItem("Toutes les projets")
+        self.projects_list.clear()
+        
+        from PySide6.QtWidgets import QListWidgetItem
+        from PySide6.QtGui import QColor
         
         projects = self.project_service.get_all_projects()
         for project in projects:
             self.project_filter.addItem(f"{project.name}")
+            
+            # Temps total par projet
+            time_sec = self.work_session_service.get_project_total_time(project.id)
+            time_str = f" - {time_sec // 3600}h {(time_sec % 3600) // 60}m" if time_sec > 0 else ""
+            
+            item = QListWidgetItem(f"● {project.name}{time_str}")
+            item.setForeground(QColor(project.color or "#4edea3"))
+            self.projects_list.addItem(item)
     
     def add_task(self):
         """Ouvre le dialogue d'ajout de tâche"""
@@ -307,6 +354,14 @@ class MainWindow(QMainWindow):
         dialog = TaskDialog(self.task_service, self.project_service, task, self.settings_service, self)
         if dialog.exec():
             self.load_data()
+            
+    def toggle_task_timer(self, task):
+        """Gère le démarrage/arrêt du chronomètre pour une tâche"""
+        active_session = self.work_session_service.get_active_session()
+        if active_session and active_session.task_id == task.id:
+            self.timer_widget.stop_session()
+        else:
+            self.timer_widget.start_session(task.id)
 
     def show_task_details(self, selection):
         """Affiche les détails de la tâche sélectionnée"""

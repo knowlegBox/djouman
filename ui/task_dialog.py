@@ -3,7 +3,8 @@ Dialogue de création et modification de tâches
 """
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
                                QLineEdit, QTextEdit, QSpinBox, QComboBox, 
-                               QDateTimeEdit, QPushButton, QLabel, QGroupBox, QCheckBox)
+                               QDateTimeEdit, QPushButton, QLabel, QGroupBox, QCheckBox,
+                               QTabWidget, QListWidget, QWidget)
 from PySide6.QtCore import Qt, QDateTime
 from services import TaskService, ProjectService
 from models import Task
@@ -100,9 +101,29 @@ class TaskDialog(QDialog):
         self.duration_input = QSpinBox()
         self.duration_input.setRange(0, 9999)
         self.duration_input.setSuffix(" minutes")
-        form_layout.addRow("Durée min.:", self.duration_input)
+        form_layout.addRow("Durée est.:", self.duration_input)
         
-        layout.addWidget(form_group)
+        self.tabs = QTabWidget()
+        self.tabs.addTab(form_group, "Détails")
+        
+        # Onglet Historique Temps
+        self.time_tab = QWidget()
+        time_layout = QVBoxLayout(self.time_tab)
+        
+        # En-tête temps total
+        self.total_time_label = QLabel("Temps total : 0h 00m 00s")
+        self.total_time_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        time_layout.addWidget(self.total_time_label)
+        
+        # Liste des sessions
+        self.sessions_list = QListWidget()
+        time_layout.addWidget(QLabel("Historique des sessions :"))
+        time_layout.addWidget(self.sessions_list)
+        
+        if self.task:
+            self.tabs.addTab(self.time_tab, "Temps de travail")
+            
+        layout.addWidget(self.tabs)
         
         # Boutons
         button_layout = QHBoxLayout()
@@ -163,6 +184,52 @@ class TaskDialog(QDialog):
                 if self.project_combo.itemData(i) == self.task.project_id:
                     self.project_combo.setCurrentIndex(i)
                     break
+                    
+        # Charger l'historique des temps
+        self.load_time_history()
+
+    def load_time_history(self):
+        """Charge l'historique des sessions de travail"""
+        from utils import format_duration
+        if not self.task or not hasattr(self.task, 'work_sessions'):
+            return
+            
+        self.sessions_list.clear()
+        total_seconds = 0
+        
+        for session in sorted(self.task.work_sessions, key=lambda s: s.start_time, reverse=True):
+            if session.end_time:
+                duration_str = format_duration(session.duration // 60) # format_duration expects minutes, or we can make a custom string
+                duration_sec = session.duration
+                time_str = f"{session.start_time.strftime('%d/%m/%Y %H:%M')} - {duration_sec // 3600}h {(duration_sec % 3600) // 60}m {duration_sec % 60}s"
+                total_seconds += duration_sec
+            else:
+                time_str = f"{session.start_time.strftime('%d/%m/%Y %H:%M')} - EN COURS"
+                
+            self.sessions_list.addItem(time_str)
+            
+        # Mettre à jour le temps total
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        secs = total_seconds % 60
+        
+        time_text = f"Temps total : {hours}h {minutes:02d}m {secs:02d}s"
+        
+        if self.task.duration:
+            est_seconds = self.task.duration * 60
+            diff = total_seconds - est_seconds
+            diff_hours = abs(diff) // 3600
+            diff_mins = (abs(diff) % 3600) // 60
+            if diff > 0:
+                time_text += f" (Dépassement: +{diff_hours}h {diff_mins:02d}m)"
+                self.total_time_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #e74c3c;")
+            else:
+                time_text += f" (Avance: -{diff_hours}h {diff_mins:02d}m)"
+                self.total_time_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #4edea3;")
+        else:
+            self.total_time_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+            
+        self.total_time_label.setText(time_text)
     
     def save_task(self):
         """Sauvegarde la tâche"""

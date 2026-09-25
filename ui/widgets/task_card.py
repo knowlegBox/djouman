@@ -9,6 +9,7 @@ class TaskCard(QFrame):
     # Signaux
     clicked = Signal(object)  # Émet l'objet Task
     double_clicked = Signal(object) # Émet l'objet Task pour édition
+    timer_toggled = Signal(object) # Émet l'objet Task pour démarrer/arrêter le timer
     
     def __init__(self, task, parent=None):
         super().__init__(parent)
@@ -37,6 +38,18 @@ class TaskCard(QFrame):
         
         header_layout.addWidget(self.priority_badge)
         header_layout.addStretch()
+        
+        # Bouton Timer
+        from PySide6.QtWidgets import QPushButton
+        self.timer_btn = QPushButton("▶️")
+        self.timer_btn.setFixedSize(28, 28)
+        self.timer_btn.setToolTip("Démarrer le chronomètre")
+        self.timer_btn.setStyleSheet("""
+            QPushButton { background-color: transparent; border: 1px solid #3c4a42; border-radius: 14px; }
+            QPushButton:hover { background-color: #242c27; border-color: #4edea3; }
+        """)
+        self.timer_btn.clicked.connect(self.on_timer_clicked)
+        header_layout.addWidget(self.timer_btn)
         
         # Status icône ou texte simple en haut à droite
         self.status_label = QLabel(format_status(self.task.status))
@@ -169,3 +182,7 @@ class TaskCard(QFrame):
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.double_clicked.emit(self.task)
+            
+    def on_timer_clicked(self):
+        # On ne propage pas le clic à la carte
+        self.timer_toggled.emit(self.task)

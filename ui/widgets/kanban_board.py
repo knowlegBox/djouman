@@ -90,6 +90,7 @@ class KanbanBoard(QWidget):
     """Tableau Kanban complet"""
     
     task_clicked = Signal(object)
+    timer_toggled = Signal(object)
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -128,6 +129,7 @@ class KanbanBoard(QWidget):
             card = TaskCard(task)
             card.clicked.connect(lambda t=task: self.task_clicked.emit(t))
             card.double_clicked.connect(lambda t=task: self.task_clicked.emit(t))
+            card.timer_toggled.connect(lambda t=task: self.timer_toggled.emit(t))
             
             self.columns[status].add_card(card)
             counts[status] += 1

@@ -13,7 +13,7 @@ sys.path.insert(0, str(root_dir))
 from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import Qt
 from ui.main_window import MainWindow
-from services import DatabaseService, ProjectService
+from services import DatabaseService, ProjectService, WorkSessionService
 from config.settings import DEFAULT_STYLES
 from utils.startup import register_startup
 
@@ -74,6 +74,7 @@ def main():
         
         # Création des services
         project_service = ProjectService(db_service)
+        work_session_service = WorkSessionService(db_service)
         print("✅ Services créés")
         
         # Création des projets par défaut (vide)
