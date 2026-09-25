@@ -15,8 +15,11 @@ class TaskService:
         self.db_service = db_service
     
     def create_task(self, title: str, description: str = None, duration: int = None, 
-                   priority: int = 1, status: str = 'pending', category_id: int = None, 
-                   start_date: str = None, end_date: str = None) -> Optional[Task]:
+                   priority: int = 1, status: str = 'pending', project_id: int = None, 
+                   start_date: str = None, end_date: str = None,
+                   task_type: str = 'feature', branch: str = None, ticket_url: str = None,
+                   is_blocked: bool = False, blocked_reason: str = None,
+                   effort: str = None, effort_description: str = None) -> Optional[Task]:
         """Crée une nouvelle tâche"""
         session = self.db_service.get_session()
         try:
@@ -26,9 +29,16 @@ class TaskService:
                 duration=duration,
                 priority=priority,
                 status=status,
-                category_id=category_id,
+                project_id=project_id,
                 start_date=start_date,
-                end_date=end_date
+                end_date=end_date,
+                task_type=task_type,
+                branch=branch,
+                ticket_url=ticket_url,
+                is_blocked=is_blocked,
+                blocked_reason=blocked_reason,
+                effort=effort,
+                effort_description=effort_description
             )
             session.add(task)
             session.commit()
@@ -46,7 +56,7 @@ class TaskService:
         session = self.db_service.get_session()
         try:
             from sqlalchemy.orm import joinedload
-            return session.query(Task).options(joinedload(Task.category)).filter(Task.id == task_id).first()
+            return session.query(Task).options(joinedload(Task.project)).filter(Task.id == task_id).first()
         except SQLAlchemyError as e:
             print(f"Erreur lors de la récupération de la tâche : {e}")
             return None
@@ -58,7 +68,7 @@ class TaskService:
         session = self.db_service.get_session()
         try:
             from sqlalchemy.orm import joinedload
-            return session.query(Task).options(joinedload(Task.category)).order_by(Task.created_at.desc()).all()
+            return session.query(Task).options(joinedload(Task.project)).order_by(Task.created_at.desc()).all()
         except SQLAlchemyError as e:
             print(f"Erreur lors de la récupération des tâches : {e}")
             return []
@@ -76,11 +86,11 @@ class TaskService:
         finally:
             session.close()
     
-    def get_tasks_by_category(self, category_id: int) -> List[Task]:
-        """Récupère les tâches par catégorie"""
+    def get_tasks_by_project(self, project_id: int) -> List[Task]:
+        """Récupère les tâches par projet"""
         session = self.db_service.get_session()
         try:
-            return session.query(Task).filter(Task.category_id == category_id).order_by(Task.created_at.desc()).all()
+            return session.query(Task).filter(Task.project_id == project_id).order_by(Task.created_at.desc()).all()
         except SQLAlchemyError as e:
             print(f"Erreur lors de la récupération des tâches : {e}")
             return []

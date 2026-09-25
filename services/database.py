@@ -4,7 +4,7 @@ Service de configuration de la base de données
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
-from models import Base, Task, Category  # Import des modèles pour enregistrement
+from models import Base, Task, Project  # Import des modèles pour enregistrement
 from config.settings import DATABASE_URL
 
 # Création du moteur SQLAlchemy

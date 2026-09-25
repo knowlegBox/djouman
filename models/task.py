@@ -21,11 +21,19 @@ class Task(Base):
     end_date = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    category_id = Column(Integer, ForeignKey('categories.id'))
+    task_type = Column(String(50), default='feature') # bug, feature, refactor, test, doc, hotfix
+    branch = Column(String(100))
+    ticket_url = Column(String(255))
+    is_blocked = Column(Boolean, default=False)
+    blocked_reason = Column(Text)
+    effort = Column(String(50))
+    effort_description = Column(Text)
+    
+    project_id = Column(Integer, ForeignKey('projects.id'))
     is_completed = Column(Boolean, default=False)
     
     # Relations
-    category = relationship("Category", back_populates="tasks", lazy="select")
+    project = relationship("Project", back_populates="tasks", lazy="select")
     
     def __repr__(self):
         return f"<Task(id={self.id}, title='{self.title}', status='{self.status}')>"
