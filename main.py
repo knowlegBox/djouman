@@ -13,7 +13,7 @@ sys.path.insert(0, str(root_dir))
 from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import Qt
 from ui.main_window import MainWindow
-from services import DatabaseService, CategoryService
+from services import DatabaseService, ProjectService
 from config.settings import DEFAULT_STYLES
 from utils.startup import register_startup
 
@@ -43,18 +43,8 @@ def initialize_database():
         raise
 
 
-def create_default_categories(category_service):
-    """Crée les catégories par défaut si elles n'existent pas"""
-    try:
-        existing_categories = category_service.get_all_categories()
-        if not existing_categories:
-            print("📁 Création des catégories par défaut...")
-            default_categories = category_service.get_default_categories()
-            print(f"✅ {len(default_categories)} catégories créées")
-        else:
-            print(f"📁 {len(existing_categories)} catégories existantes trouvées")
-    except Exception as e:
-        print(f"⚠️ Erreur lors de la création des catégories : {e}")
+def create_default_projects(project_service):
+    pass # On ne crée pas de projet par défaut pour l'instant
 
 
 def show_error_dialog(title, message):
@@ -83,11 +73,11 @@ def main():
         db_service = initialize_database()
         
         # Création des services
-        category_service = CategoryService(db_service)
+        project_service = ProjectService(db_service)
         print("✅ Services créés")
         
-        # Création des catégories par défaut
-        create_default_categories(category_service)
+        # Création des projets par défaut (vide)
+        create_default_projects(project_service)
         
         # Création de la fenêtre principale
         print("🖥️ Création de l'interface utilisateur...")

@@ -9,13 +9,13 @@ from PySide6.QtGui import QAction
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QIcon, QFont, QColor
 from datetime import datetime, timedelta
-from services import DatabaseService, TaskService, CategoryService, SettingsService
-from models import Task, Category
+from services import DatabaseService, TaskService, ProjectService, SettingsService
+from models import Task, Project
 from utils import format_duration, format_priority, format_status, get_priority_color, get_status_color
 from config.settings import WINDOW_TITLE, WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT, DEFAULT_STYLES
 from ui.models.task_table_model import TaskTableModel
 from ui.task_dialog import TaskDialog
-from ui.category_dialog import CategoryDialog
+from ui.project_dialog import ProjectDialog
 from ui.widgets.screen_blocker import TaskScreenBlocker
 from ui.widgets.settings_tab import SettingsTab
 from ui.widgets.task_card import TaskCard
@@ -29,7 +29,7 @@ class MainWindow(QMainWindow):
         self.settings_service = SettingsService()
         self.db_service = DatabaseService()
         self.task_service = TaskService(self.db_service)
-        self.category_service = CategoryService(self.db_service)
+        self.project_service = ProjectService(self.db_service)
         
         self.setup_ui()
         self.load_data()
@@ -92,11 +92,11 @@ class MainWindow(QMainWindow):
         # Action Buttons in Sidebar
         self.add_task_btn = QPushButton("➕ Nouvelle tâche")
         self.add_task_btn.setObjectName("primary_btn")
-        self.add_category_btn = QPushButton("📁 Nouvelle catégorie")
-        self.add_category_btn.setObjectName("secondary_btn")
+        self.add_project_btn = QPushButton("📁 Nouvelle projet")
+        self.add_project_btn.setObjectName("secondary_btn")
         
         sidebar_layout.addWidget(self.add_task_btn)
-        sidebar_layout.addWidget(self.add_category_btn)
+        sidebar_layout.addWidget(self.add_project_btn)
         
         sidebar_layout.addStretch()
         
@@ -124,13 +124,13 @@ class MainWindow(QMainWindow):
         # Filtres (déplacés dans la top bar pour le moment)
         self.status_filter = QComboBox()
         self.status_filter.addItems(["Tous", "En attente", "En cours", "Terminée", "Annulée"])
-        self.category_filter = QComboBox()
-        self.category_filter.addItems(["Toutes les catégories"])
+        self.project_filter = QComboBox()
+        self.project_filter.addItems(["Toutes les projets"])
         
         topbar_layout.addWidget(QLabel("Statut:"))
         topbar_layout.addWidget(self.status_filter)
-        topbar_layout.addWidget(QLabel("Catégorie:"))
-        topbar_layout.addWidget(self.category_filter)
+        topbar_layout.addWidget(QLabel("Projet:"))
+        topbar_layout.addWidget(self.project_filter)
         
         
         # Toggle Vue
@@ -159,24 +159,11 @@ class MainWindow(QMainWindow):
         
         self.task_view_stack = QStackedWidget()
         
-        # --- Page 0: Grid View (Cartes) ---
-        self.grid_scroll = QScrollArea()
-        self.grid_scroll.setWidgetResizable(True)
-        self.grid_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.grid_scroll.setObjectName("gridScroll")
-        self.grid_scroll.setStyleSheet("QScrollArea#gridScroll { border: none; background-color: transparent; }")
-        
-        self.grid_widget = QWidget()
-        self.grid_widget.setObjectName("gridWidget")
-        from PySide6.QtWidgets import QSizePolicy
-        self.grid_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.grid_widget.setStyleSheet("QWidget#gridWidget { background-color: transparent; }")
-        self.grid_layout = QGridLayout(self.grid_widget)
-        # self.grid_layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-        self.grid_layout.setSpacing(15)
-        
-        self.grid_scroll.setWidget(self.grid_widget)
-        self.task_view_stack.addWidget(self.grid_scroll)
+        # --- Page 0: Kanban View ---
+        from ui.widgets.kanban_board import KanbanBoard
+        self.kanban_board = KanbanBoard()
+        self.kanban_board.task_clicked.connect(self.edit_task_from_card)
+        self.task_view_stack.addWidget(self.kanban_board)
         
         # --- Page 1: List View (Tableau) + Details ---
         content_splitter = QSplitter(Qt.Horizontal)
@@ -235,14 +222,14 @@ class MainWindow(QMainWindow):
     def setup_connections(self):
         """Configure les connexions des signaux"""
         self.add_task_btn.clicked.connect(self.add_task)
-        self.add_category_btn.clicked.connect(self.add_category)
+        self.add_project_btn.clicked.connect(self.add_project)
         self.refresh_btn.clicked.connect(self.load_data)
         self.view_grid_btn.clicked.connect(lambda: self.task_view_stack.setCurrentIndex(0))
         self.view_list_btn.clicked.connect(lambda: self.task_view_stack.setCurrentIndex(1))
         
         self.search_input.textChanged.connect(self.filter_tasks)
         self.status_filter.currentTextChanged.connect(self.filter_tasks)
-        self.category_filter.currentTextChanged.connect(self.filter_tasks)
+        self.project_filter.currentTextChanged.connect(self.filter_tasks)
         
         self.task_table.selectionModel().selectionChanged.connect(self.show_task_details)
         self.task_table.customContextMenuRequested.connect(self.show_context_menu)
@@ -269,7 +256,7 @@ class MainWindow(QMainWindow):
     def load_data(self):
         """Charge les données"""
         self.load_tasks()
-        self.load_categories()
+        self.load_projects()
         self.filter_tasks()
     
     def load_tasks(self):
@@ -287,37 +274,37 @@ class MainWindow(QMainWindow):
             header.setSectionResizeMode(2, QHeaderView.ResizeToContents) # Statut
             header.setSectionResizeMode(3, QHeaderView.ResizeToContents) # Priorité
             header.setSectionResizeMode(4, QHeaderView.ResizeToContents) # Durée
-            header.setSectionResizeMode(5, QHeaderView.ResizeToContents) # Catégorie
+            header.setSectionResizeMode(5, QHeaderView.ResizeToContents) # Projet
             header.setSectionResizeMode(6, QHeaderView.ResizeToContents) # Date échéance
             header.setSectionResizeMode(7, QHeaderView.ResizeToContents) # Créée le
         else:
             self.task_model.set_tasks(tasks)
     
-    def load_categories(self):
-        """Charge la liste des catégories"""
-        self.category_filter.clear()
-        self.category_filter.addItem("Toutes les catégories")
+    def load_projects(self):
+        """Charge la liste des projets"""
+        self.project_filter.clear()
+        self.project_filter.addItem("Toutes les projets")
         
-        categories = self.category_service.get_all_categories()
-        for category in categories:
-            self.category_filter.addItem(f"{category.name}")
+        projects = self.project_service.get_all_projects()
+        for project in projects:
+            self.project_filter.addItem(f"{project.name}")
     
     def add_task(self):
         """Ouvre le dialogue d'ajout de tâche"""
-        dialog = TaskDialog(self.task_service, self.category_service, settings_service=self.settings_service, parent=self)
+        dialog = TaskDialog(self.task_service, self.project_service, settings_service=self.settings_service, parent=self)
         if dialog.exec() == TaskDialog.Accepted:
             self.load_tasks()
             self.update_chart()
     
-    def add_category(self):
-        """Ouvre le dialogue d'ajout de catégorie"""
-        dialog = CategoryDialog(self.category_service, self)
-        if dialog.exec() == CategoryDialog.Accepted:
-            self.load_categories()
+    def add_project(self):
+        """Ouvre le dialogue d'ajout de projet"""
+        dialog = ProjectDialog(self.project_service, parent=self)
+        if dialog.exec() == ProjectDialog.Accepted:
+            self.load_projects()
     
     def edit_task_from_card(self, task):
         """Ouvre la boîte de dialogue pour éditer une tâche depuis la vue carte"""
-        dialog = TaskDialog(self.task_service, self.category_service, task, self.settings_service, self)
+        dialog = TaskDialog(self.task_service, self.project_service, task, self.settings_service, self)
         if dialog.exec():
             self.load_data()
 
@@ -338,8 +325,8 @@ class MainWindow(QMainWindow):
             details.append(f"Priorité: {format_priority(task.priority)}")
             if task.duration:
                 details.append(f"Durée: {format_duration(task.duration)}")
-            if task.category:
-                details.append(f"Catégorie: {task.category.name}")
+            if task.project:
+                details.append(f"Projet: {task.project.name}")
             if task.start_date:
                 details.append(f"Début: {task.start_date.strftime('%d/%m/%Y %H:%M')}")
             if task.end_date:
@@ -351,7 +338,7 @@ class MainWindow(QMainWindow):
         """Filtre les tâches selon les critères"""
         search_text = self.search_input.text().lower()
         status_text = self.status_filter.currentText()
-        category_text = self.category_filter.currentText()
+        project_text = self.project_filter.currentText()
         today = datetime.now().date()
         
         all_tasks = self.task_service.get_all_tasks()
@@ -387,39 +374,23 @@ class MainWindow(QMainWindow):
                 if format_status(task.status) != status_text:
                     match_status = False
                     
-            # Filtre de catégorie
-            match_category = True
-            if category_text != "Toutes les catégories":
-                cat_name = task.category.name if task.category else "Aucune"
-                if cat_name != category_text:
-                    match_category = False
+            # Filtre de projet
+            match_project = True
+            if project_text != "Toutes les projets":
+                cat_name = task.project.name if task.project else "Aucune"
+                if cat_name != project_text:
+                    match_project = False
             
-            if match_search and match_status and match_category:
+            if match_search and match_status and match_project:
                 filtered_tasks.append(task)
                 
         if hasattr(self, 'task_model'):
             self.task_model.set_tasks(filtered_tasks)
             self.update_chart()
             
-        # Mettre à jour la vue Grille
-        if hasattr(self, 'grid_layout'):
-            # Vider la grille
-            while self.grid_layout.count():
-                item = self.grid_layout.takeAt(0)
-                widget = item.widget()
-                if widget:
-                    widget.deleteLater()
-                    
-            # Remplir la grille
-            # La réorganisation se fera par reflow_grid
-            for task in filtered_tasks:
-                card = TaskCard(task, self.grid_widget)
-                card.double_clicked.connect(self.edit_task_from_card)
-                card.clicked.connect(self.edit_task_from_card) 
-                self.grid_layout.addWidget(card, 0, 0) # Sera réorganisé par reflow_grid
-                card.show()
-                
-            self.reflow_grid()
+        # Mettre à jour la vue Kanban
+        if hasattr(self, 'kanban_board'):
+            self.kanban_board.set_tasks(filtered_tasks)
             
     def update_chart(self):
         """Met à jour le graphique des statistiques"""
@@ -551,7 +522,7 @@ class MainWindow(QMainWindow):
     def edit_task(self, task):
         """Modifie une tâche"""
         if task:
-            dialog = TaskDialog(self.task_service, self.category_service, task, self.settings_service, self)
+            dialog = TaskDialog(self.task_service, self.project_service, task, self.settings_service, self)
             if dialog.exec() == TaskDialog.Accepted:
                 self.load_tasks()
                 self.filter_tasks() # Réapplique le filtre après édition
@@ -617,39 +588,3 @@ class MainWindow(QMainWindow):
         """Ferme l'application proprement"""
         self.db_service.close()
         event.accept()
-
-    def resizeEvent(self, event):
-        """Gère le redimensionnement de la fenêtre pour ajuster la grille de cartes"""
-        super().resizeEvent(event)
-        self.reflow_grid()
-        
-    def reflow_grid(self):
-        """Réorganise les cartes dans la grille en fonction de la largeur disponible"""
-        if not hasattr(self, 'grid_layout') or not hasattr(self, 'grid_scroll'):
-            return
-            
-        # Largeur disponible dans la zone de défilement (en tenant compte de la scrollbar verticale)
-        available_width = self.grid_scroll.viewport().width() - 20 
-        
-        # Largeur d'une carte + espacement
-        card_width = 280 + 15
-        
-        # Nombre de colonnes (au moins 1)
-        max_cols = max(1, available_width // card_width)
-        
-        # Récupérer tous les widgets (cartes)
-        widgets = []
-        for i in range(self.grid_layout.count()):
-            item = self.grid_layout.itemAt(i)
-            if item and item.widget():
-                widgets.append(item.widget())
-                
-        # Réorganiser
-        row, col = 0, 0
-        for w in widgets:
-            self.grid_layout.removeWidget(w)
-            self.grid_layout.addWidget(w, row, col)
-            col += 1
-            if col >= max_cols:
-                col = 0
-                row += 1

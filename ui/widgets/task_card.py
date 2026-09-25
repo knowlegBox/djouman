@@ -67,8 +67,8 @@ class TaskCard(QFrame):
         # Pied de carte : Heure et Catégorie
         footer_layout = QHBoxLayout()
         
-        cat_name = self.task.category.name if self.task.category else "Sans catégorie"
-        cat_color = self.task.category.color if self.task.category else "#86948a"
+        cat_name = self.task.project.name if self.task.project else "Sans projet"
+        cat_color = self.task.project.color if self.task.project else "#86948a"
         
         self.cat_dot = QLabel("●")
         self.cat_dot.setStyleSheet(f"color: {cat_color}; font-size: 14px;")
