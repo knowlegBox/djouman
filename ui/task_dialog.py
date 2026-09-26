@@ -123,6 +123,26 @@ class TaskDialog(QDialog):
         if self.task:
             self.tabs.addTab(self.time_tab, "Temps de travail")
             
+            # Onglet Sous-tâches
+            self.subtask_tab = QWidget()
+            subtask_layout = QVBoxLayout(self.subtask_tab)
+            
+            add_layout = QHBoxLayout()
+            self.subtask_input = QLineEdit()
+            self.subtask_input.setPlaceholderText("Nouvelle sous-tâche...")
+            self.add_subtask_btn = QPushButton("Ajouter")
+            add_layout.addWidget(self.subtask_input)
+            add_layout.addWidget(self.add_subtask_btn)
+            subtask_layout.addLayout(add_layout)
+            
+            self.subtasks_list = QListWidget()
+            subtask_layout.addWidget(self.subtasks_list)
+            
+            self.add_subtask_btn.clicked.connect(self.add_subtask)
+            self.subtasks_list.itemChanged.connect(self.subtask_toggled)
+            
+            self.tabs.addTab(self.subtask_tab, "Sous-tâches")
+            
         layout.addWidget(self.tabs)
         
         # Boutons
@@ -187,6 +207,9 @@ class TaskDialog(QDialog):
                     
         # Charger l'historique des temps
         self.load_time_history()
+        
+        # Charger les sous-tâches
+        self.load_subtasks()
 
     def load_time_history(self):
         """Charge l'historique des sessions de travail"""
@@ -268,3 +291,54 @@ class TaskDialog(QDialog):
     def show_error(self, message):
         from PySide6.QtWidgets import QMessageBox
         QMessageBox.warning(self, "Erreur", message)
+        
+    def load_subtasks(self):
+        """Charge les sous-tâches dans la liste"""
+        if not self.task: return
+        self.subtasks_list.blockSignals(True)
+        self.subtasks_list.clear()
+        
+        # S'assurer d'avoir les données fraîches
+        session = self.task_service.db_service.get_session()
+        from models.subtask import SubTask
+        subtasks = session.query(SubTask).filter(SubTask.task_id == self.task.id).order_by(SubTask.id.asc()).all()
+        
+        from PySide6.QtWidgets import QListWidgetItem
+        from PySide6.QtCore import Qt
+        for st in subtasks:
+            item = QListWidgetItem(st.title)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked if st.is_completed else Qt.Unchecked)
+            item.setData(Qt.UserRole, st.id)
+            self.subtasks_list.addItem(item)
+            
+        self.subtasks_list.blockSignals(False)
+        session.close()
+
+    def add_subtask(self):
+        """Ajoute une sous-tâche"""
+        title = self.subtask_input.text().strip()
+        if not title or not self.task: return
+        
+        session = self.task_service.db_service.get_session()
+        from models.subtask import SubTask
+        st = SubTask(title=title, task_id=self.task.id)
+        session.add(st)
+        session.commit()
+        session.close()
+        
+        self.subtask_input.clear()
+        self.load_subtasks()
+
+    def subtask_toggled(self, item):
+        """Met à jour le statut de la sous-tâche"""
+        st_id = item.data(Qt.UserRole)
+        is_completed = (item.checkState() == Qt.Checked)
+        
+        session = self.task_service.db_service.get_session()
+        from models.subtask import SubTask
+        st = session.query(SubTask).filter(SubTask.id == st_id).first()
+        if st:
+            st.is_completed = is_completed
+            session.commit()
+        session.close()
