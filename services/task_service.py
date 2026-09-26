@@ -56,7 +56,7 @@ class TaskService:
         session = self.db_service.get_session()
         try:
             from sqlalchemy.orm import joinedload
-            return session.query(Task).options(joinedload(Task.project)).filter(Task.id == task_id).first()
+            return session.query(Task).options(joinedload(Task.project), joinedload(Task.work_sessions)).filter(Task.id == task_id).first()
         except SQLAlchemyError as e:
             print(f"Erreur lors de la récupération de la tâche : {e}")
             return None
@@ -68,7 +68,7 @@ class TaskService:
         session = self.db_service.get_session()
         try:
             from sqlalchemy.orm import joinedload
-            return session.query(Task).options(joinedload(Task.project)).order_by(Task.created_at.desc()).all()
+            return session.query(Task).options(joinedload(Task.project), joinedload(Task.work_sessions)).order_by(Task.created_at.desc()).all()
         except SQLAlchemyError as e:
             print(f"Erreur lors de la récupération des tâches : {e}")
             return []
@@ -79,7 +79,8 @@ class TaskService:
         """Récupère les tâches par statut"""
         session = self.db_service.get_session()
         try:
-            return session.query(Task).filter(Task.status == status).order_by(Task.created_at.desc()).all()
+            from sqlalchemy.orm import joinedload
+            return session.query(Task).options(joinedload(Task.project), joinedload(Task.work_sessions)).filter(Task.status == status).order_by(Task.created_at.desc()).all()
         except SQLAlchemyError as e:
             print(f"Erreur lors de la récupération des tâches : {e}")
             return []
@@ -90,7 +91,8 @@ class TaskService:
         """Récupère les tâches par projet"""
         session = self.db_service.get_session()
         try:
-            return session.query(Task).filter(Task.project_id == project_id).order_by(Task.created_at.desc()).all()
+            from sqlalchemy.orm import joinedload
+            return session.query(Task).options(joinedload(Task.project), joinedload(Task.work_sessions)).filter(Task.project_id == project_id).order_by(Task.created_at.desc()).all()
         except SQLAlchemyError as e:
             print(f"Erreur lors de la récupération des tâches : {e}")
             return []

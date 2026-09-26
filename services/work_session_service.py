@@ -25,7 +25,10 @@ class WorkSessionService:
             new_session = WorkSession(task_id=task_id, start_time=datetime.utcnow(), notes=notes)
             session.add(new_session)
             session.commit()
-            return new_session
+            
+            # Recharger avec relations
+            from sqlalchemy.orm import joinedload
+            return session.query(WorkSession).options(joinedload(WorkSession.task).joinedload(Task.project)).filter(WorkSession.id == new_session.id).first()
         except Exception as e:
             session.rollback()
             print(f"Erreur lors du démarrage de la session: {e}")
@@ -51,7 +54,8 @@ class WorkSessionService:
     def get_active_session(self) -> WorkSession:
         """Récupère la session de travail active"""
         session = self.db_service.get_session()
-        return session.query(WorkSession).filter(WorkSession.end_time.is_(None)).first()
+        from sqlalchemy.orm import joinedload
+        return session.query(WorkSession).options(joinedload(WorkSession.task).joinedload(Task.project)).filter(WorkSession.end_time.is_(None)).first()
         
     def get_task_sessions(self, task_id: int):
         """Récupère l'historique des sessions pour une tâche"""

@@ -50,11 +50,15 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
         
         # Widget central
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        from PySide6.QtWidgets import QStackedWidget
+        self.global_stack = QStackedWidget()
+        self.setCentralWidget(self.global_stack)
+        
+        main_container = QWidget()
+        self.global_stack.addWidget(main_container)
         
         # Layout principal horizontal (Sidebar + Contenu)
-        main_layout = QHBoxLayout(central_widget)
+        main_layout = QHBoxLayout(main_container)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
@@ -244,6 +248,35 @@ class MainWindow(QMainWindow):
         
         self.stacked_widget.setCurrentIndex(0)
         
+        # --- Focus Mode ---
+        from ui.widgets.focus_widget import FocusModeWidget
+        self.focus_widget = FocusModeWidget(self.work_session_service, self.task_service)
+        self.focus_widget.exit_requested.connect(self.exit_focus_mode)
+        self.global_stack.addWidget(self.focus_widget)
+        
+    def enter_focus_mode(self, task_id):
+        """Passe en mode focus plein écran à partir d'un ID de tâche"""
+        task = self.task_service.get_task(task_id)
+        if not task:
+            return
+            
+        # S'assurer que le timer démarre
+        active = self.work_session_service.get_active_session()
+        if not active or active.task_id != task.id:
+            self.work_session_service.start_session(task.id)
+            self.timer_widget.check_active_session()
+            
+        self.focus_widget.start_focus(task)
+        self.global_stack.setCurrentIndex(1)
+        self.showFullScreen()
+        
+    def exit_focus_mode(self):
+        """Quitte le mode focus"""
+        self.focus_widget.stop_focus()
+        self.global_stack.setCurrentIndex(0)
+        self.showNormal()
+        self.load_data()
+        
     def on_settings_changed(self):
         """Callback quand les paramètres sont modifiés"""
         self.apply_styles()
@@ -257,6 +290,8 @@ class MainWindow(QMainWindow):
         self.refresh_btn.clicked.connect(self.load_data)
         self.view_grid_btn.clicked.connect(lambda: self.task_view_stack.setCurrentIndex(0))
         self.view_list_btn.clicked.connect(lambda: self.task_view_stack.setCurrentIndex(1))
+        
+        self.timer_widget.focus_requested.connect(self.enter_focus_mode)
         
         self.search_input.textChanged.connect(self.filter_tasks)
         self.status_filter.currentTextChanged.connect(self.filter_tasks)
