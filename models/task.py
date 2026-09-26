@@ -31,6 +31,7 @@ class Task(Base):
     
     project_id = Column(Integer, ForeignKey('projects.id'))
     is_completed = Column(Boolean, default=False)
+    in_sprint = Column(Boolean, default=False)
     
     # Relations
     project = relationship("Project", back_populates="tasks", lazy="select")

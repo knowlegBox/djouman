@@ -6,5 +6,6 @@ from .task_item import TaskItemWidget
 from .timer_widget import TimerWidget
 from .dashboard_tab import DashboardTab
 from .focus_widget import FocusModeWidget
+from .sprint_board import SprintBoardTab
 
-__all__ = ['TaskListWidget', 'TaskItemWidget', 'TimerWidget', 'DashboardTab', 'FocusModeWidget']
+__all__ = ['TaskListWidget', 'TaskItemWidget', 'TimerWidget', 'DashboardTab', 'FocusModeWidget', 'SprintBoardTab']

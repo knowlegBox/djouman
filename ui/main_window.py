@@ -84,14 +84,17 @@ class MainWindow(QMainWindow):
         self.stacked_widget = QStackedWidget()
         
         self.nav_tasks_btn = QPushButton("📝 Tâches")
+        self.nav_sprint_btn = QPushButton("🏃 Sprint & Backlog")
         self.nav_dashboard_btn = QPushButton("📊 Tableau de bord")
         self.nav_settings_btn = QPushButton("⚙️ Paramètres")
         
         self.nav_tasks_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
+        self.nav_sprint_btn.clicked.connect(self.switch_to_sprint)
         self.nav_settings_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
-        self.nav_dashboard_btn.clicked.connect(lambda: self.switch_to_dashboard())
+        self.nav_dashboard_btn.clicked.connect(self.switch_to_dashboard)
         
         sidebar_layout.addWidget(self.nav_tasks_btn)
+        sidebar_layout.addWidget(self.nav_sprint_btn)
         sidebar_layout.addWidget(self.nav_dashboard_btn)
         sidebar_layout.addWidget(self.nav_settings_btn)
         
@@ -153,6 +156,12 @@ class MainWindow(QMainWindow):
         self.status_filter.addItems(["Tous", "En attente", "En cours", "Terminée", "Annulée"])
         self.project_filter = QComboBox()
         self.project_filter.addItems(["Toutes les projets"])
+        
+        self.sprint_filter = QComboBox()
+        self.sprint_filter.addItems(["Tous", "Sprint Actuel", "Backlog"])
+        
+        topbar_layout.addWidget(QLabel("Vue:"))
+        topbar_layout.addWidget(self.sprint_filter)
         
         topbar_layout.addWidget(QLabel("Statut:"))
         topbar_layout.addWidget(self.status_filter)
@@ -246,6 +255,11 @@ class MainWindow(QMainWindow):
         self.dashboard_tab = DashboardTab(self.task_service, self.project_service, self.work_session_service)
         self.stacked_widget.addWidget(self.dashboard_tab)
         
+        # --- View 3: Sprint Board ---
+        from ui.widgets.sprint_board import SprintBoardTab
+        self.sprint_board_tab = SprintBoardTab(self.task_service, self.project_service)
+        self.stacked_widget.addWidget(self.sprint_board_tab)
+        
         self.stacked_widget.setCurrentIndex(0)
         
         # --- Focus Mode ---
@@ -294,6 +308,7 @@ class MainWindow(QMainWindow):
         self.timer_widget.focus_requested.connect(self.enter_focus_mode)
         
         self.search_input.textChanged.connect(self.filter_tasks)
+        self.sprint_filter.currentTextChanged.connect(self.filter_tasks)
         self.status_filter.currentTextChanged.connect(self.filter_tasks)
         self.project_filter.currentTextChanged.connect(self.filter_tasks)
         
@@ -328,6 +343,10 @@ class MainWindow(QMainWindow):
     def switch_to_dashboard(self):
         self.dashboard_tab.refresh_data()
         self.stacked_widget.setCurrentIndex(2)
+        
+    def switch_to_sprint(self):
+        self.sprint_board_tab.refresh_data()
+        self.stacked_widget.setCurrentIndex(3)
     
     def load_tasks(self):
         """Charge la liste des tâches"""
@@ -429,6 +448,7 @@ class MainWindow(QMainWindow):
         search_text = self.search_input.text().lower()
         status_text = self.status_filter.currentText()
         project_text = self.project_filter.currentText()
+        sprint_text = self.sprint_filter.currentText()
         today = datetime.now().date()
         
         all_tasks = self.task_service.get_all_tasks()
@@ -437,6 +457,12 @@ class MainWindow(QMainWindow):
         hide_completed = getattr(self, 'settings_service', None) and self.settings_service.get("hide_completed_tasks", False)
         
         for task in all_tasks:
+            match_sprint = True
+            if sprint_text == "Sprint Actuel" and not task.in_sprint:
+                match_sprint = False
+            elif sprint_text == "Backlog" and task.in_sprint:
+                match_sprint = False
+                
             # La vue par défaut rassemble les tâches du jour et les tâches non terminées.
             if status_text == "Tous":
                 is_today = any(
@@ -471,7 +497,7 @@ class MainWindow(QMainWindow):
                 if cat_name != project_text:
                     match_project = False
             
-            if match_search and match_status and match_project:
+            if match_search and match_status and match_project and match_sprint:
                 filtered_tasks.append(task)
                 
         if hasattr(self, 'task_model'):
