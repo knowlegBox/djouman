@@ -35,6 +35,7 @@ class Task(Base):
     # Relations
     project = relationship("Project", back_populates="tasks", lazy="select")
     work_sessions = relationship("WorkSession", back_populates="task", cascade="all, delete-orphan")
+    subtasks = relationship("SubTask", back_populates="task", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Task(id={self.id}, title='{self.title}', status='{self.status}')>"
