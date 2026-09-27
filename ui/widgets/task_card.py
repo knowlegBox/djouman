@@ -17,93 +17,84 @@ class TaskCard(QFrame):
         self.setFrameShape(QFrame.StyledPanel)
         self.setCursor(Qt.PointingHandCursor)
         self.setObjectName("taskCard")
-        self.setMinimumWidth(280)
-        self.setFixedHeight(180)
+        # Suppression de la hauteur fixe pour que la carte s'ajuste à son contenu
         self.setup_ui()
         self.update_style()
-        
     def setup_ui(self):
-        # Layout principal de la carte
+        # Layout principal de la carte ultra-compacte
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(8)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(4)
         
-        # En-tête : Badge priorité et Menu (virtuel)
-        header_layout = QHBoxLayout()
+        # Ligne 1 : Titre et Status
+        top_layout = QHBoxLayout()
         
-        self.priority_badge = QLabel(format_priority(self.task.priority).upper())
-        self.priority_badge.setObjectName("priorityBadge")
-        self.priority_badge.setFont(QFont("Geist", 9, QFont.Bold))
-        self.priority_badge.setContentsMargins(8, 4, 8, 4)
+        self.title_label = QLabel(self.task.title)
+        self.title_label.setFont(QFont("Inter", 10, QFont.Bold))
+        self.title_label.setWordWrap(True)
+        top_layout.addWidget(self.title_label)
         
-        header_layout.addWidget(self.priority_badge)
-        header_layout.addStretch()
+        top_layout.addStretch()
         
-        # Bouton Timer
-        from PySide6.QtWidgets import QPushButton
-        self.timer_btn = QPushButton("▶️")
-        self.timer_btn.setFixedSize(28, 28)
-        self.timer_btn.setToolTip("Démarrer le chronomètre")
-        self.timer_btn.setStyleSheet("""
-            QPushButton { background-color: transparent; border: 1px solid #3c4a42; border-radius: 14px; }
-            QPushButton:hover { background-color: #242c27; border-color: #4edea3; }
-        """)
-        self.timer_btn.clicked.connect(self.on_timer_clicked)
-        header_layout.addWidget(self.timer_btn)
-        
-        # Status icône ou texte simple en haut à droite
         self.status_label = QLabel(format_status(self.task.status))
         self.status_label.setObjectName("statusLabel")
-        self.status_label.setFont(QFont("Geist", 9))
-        header_layout.addWidget(self.status_label)
+        self.status_label.setFont(QFont("Geist", 8))
+        top_layout.addWidget(self.status_label)
         
-        layout.addLayout(header_layout)
+        layout.addLayout(top_layout)
         
-        # Titre
-        self.title_label = QLabel(self.task.title)
-        self.title_label.setFont(QFont("Inter", 12, QFont.Bold))
-        self.title_label.setWordWrap(True)
-        layout.addWidget(self.title_label)
+        # Ligne 2 : Projet, Niveau, et Timer
+        bottom_layout = QHBoxLayout()
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Description
-        desc_text = self.task.description if self.task.description else "Aucune description"
-        self.desc_label = QLabel(desc_text)
-        self.desc_label.setObjectName("descriptionLabel")
-        self.desc_label.setFont(QFont("Inter", 10))
-        self.desc_label.setWordWrap(True)
-        # Limiter la hauteur pour simuler un line-clamp
-        self.desc_label.setMaximumHeight(40) 
-        layout.addWidget(self.desc_label)
-        
-        layout.addStretch()
-        
-        # Pied de carte : Heure et Catégorie
-        footer_layout = QHBoxLayout()
-        
+        # Projet (cercle vide)
         cat_name = self.task.project.name if self.task.project else "Sans projet"
         cat_color = self.task.project.color if self.task.project else "#86948a"
         
-        self.cat_dot = QLabel("●")
-        self.cat_dot.setStyleSheet(f"color: {cat_color}; font-size: 14px;")
+        self.cat_dot = QLabel("○")
+        self.cat_dot.setStyleSheet(f"color: {cat_color}; font-size: 14px; font-weight: bold;")
         
         self.cat_label = QLabel(cat_name)
         self.cat_label.setObjectName("footerLabel")
-        self.cat_label.setFont(QFont("Inter", 9))
+        self.cat_label.setFont(QFont("Inter", 8))
         
-        footer_layout.addWidget(self.cat_dot)
-        footer_layout.addWidget(self.cat_label)
-        footer_layout.addStretch()
+        bottom_layout.addWidget(self.cat_dot)
+        bottom_layout.addWidget(self.cat_label)
         
-        time_str = ""
+        # Espace
+        bottom_layout.addSpacing(5)
+        
+        # Niveau (Priorité)
+        self.priority_badge = QLabel(format_priority(self.task.priority).upper())
+        self.priority_badge.setObjectName("priorityBadge")
+        self.priority_badge.setFont(QFont("Geist", 8, QFont.Bold))
+        self.priority_badge.setContentsMargins(4, 2, 4, 2)
+        bottom_layout.addWidget(self.priority_badge)
+        
+        bottom_layout.addStretch()
+        
+        # Heure
         if hasattr(self.task, 'start_date') and self.task.start_date:
             time_str = self.task.start_date.strftime("%H:%M")
+            self.time_label = QLabel(f"⏱ {time_str}")
+            self.time_label.setObjectName("footerLabel")
+            self.time_label.setFont(QFont("Geist", 8))
+            bottom_layout.addWidget(self.time_label)
+            bottom_layout.addSpacing(5)
         
-        self.time_label = QLabel(f"⏱ {time_str}")
-        self.time_label.setObjectName("footerLabel")
-        self.time_label.setFont(QFont("Geist", 9))
-        footer_layout.addWidget(self.time_label)
+        # Bouton Timer (plus petit)
+        from PySide6.QtWidgets import QPushButton
+        self.timer_btn = QPushButton("▶️")
+        self.timer_btn.setFixedSize(20, 20)
+        self.timer_btn.setToolTip("Démarrer le chronomètre")
+        self.timer_btn.setStyleSheet("""
+            QPushButton { background-color: transparent; border: 1px solid #3c4a42; border-radius: 10px; font-size: 8px;}
+            QPushButton:hover { background-color: #242c27; border-color: #4edea3; }
+        """)
+        self.timer_btn.clicked.connect(self.on_timer_clicked)
+        bottom_layout.addWidget(self.timer_btn)
         
-        layout.addLayout(footer_layout)
+        layout.addLayout(bottom_layout)
         
     def update_style(self):
         """Met à jour les styles en fonction de la priorité et du thème"""
