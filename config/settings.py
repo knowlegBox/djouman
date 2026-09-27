@@ -56,6 +56,7 @@ PRIORITY_LEVELS = {
 STATUS_OPTIONS = {
     'pending': "En attente",
     'in_progress': "En cours",
+    'blocked': "Bloquée",
     'completed': "Terminée",
     'cancelled': "Annulée"
 }

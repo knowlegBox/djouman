@@ -77,6 +77,7 @@ def get_status_color(status: str) -> str:
         'pending': "#6c757d",      # Gris
         'in_progress': "#007bff",   # Bleu
         'completed': "#28a745",     # Vert
-        'cancelled': "#dc3545"      # Rouge
+        'cancelled': "#6c757d",     # Gris foncé
+        'blocked': "#dc3545"        # Rouge
     }
     return color_map.get(status, "#6c757d")

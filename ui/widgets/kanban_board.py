@@ -97,19 +97,33 @@ class KanbanBoard(QWidget):
         self.setup_ui()
         
     def setup_ui(self):
-        self.layout = QHBoxLayout(self)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.board_scroll = QScrollArea()
+        self.board_scroll.setWidgetResizable(True)
+        self.board_scroll.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
+        self.board_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.board_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        
+        self.container = QWidget()
+        self.layout = QHBoxLayout(self.container)
         self.layout.setContentsMargins(15, 15, 15, 15)
         self.layout.setSpacing(15)
         
         self.columns = {
             'pending': KanbanColumn("Backlog", 'pending'),
             'in_progress': KanbanColumn("En cours", 'in_progress'),
-            'blocked': KanbanColumn("Bloqué", 'cancelled'), # using cancelled color for blocked for now
+            'blocked': KanbanColumn("Bloqué", 'blocked'),
             'completed': KanbanColumn("Terminé", 'completed')
         }
         
         for col_id in ['pending', 'in_progress', 'blocked', 'completed']:
+            self.columns[col_id].setMinimumWidth(300)
             self.layout.addWidget(self.columns[col_id])
+            
+        self.board_scroll.setWidget(self.container)
+        main_layout.addWidget(self.board_scroll)
             
     def set_tasks(self, tasks):
         for col in self.columns.values():

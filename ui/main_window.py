@@ -153,7 +153,7 @@ class MainWindow(QMainWindow):
         
         # Filtres (déplacés dans la top bar pour le moment)
         self.status_filter = QComboBox()
-        self.status_filter.addItems(["Tous", "En attente", "En cours", "Terminée", "Annulée"])
+        self.status_filter.addItems(["Tous", "En attente", "En cours", "Bloquée", "Terminée", "Annulée"])
         self.project_filter = QComboBox()
         self.project_filter.addItems(["Toutes les projets"])
         
@@ -394,8 +394,7 @@ class MainWindow(QMainWindow):
         """Ouvre le dialogue d'ajout de tâche"""
         dialog = TaskDialog(self.task_service, self.project_service, settings_service=self.settings_service, parent=self)
         if dialog.exec() == TaskDialog.Accepted:
-            self.load_tasks()
-            self.update_chart()
+            self.load_data()
     
     def add_project(self):
         """Ouvre le dialogue d'ajout de projet"""
@@ -463,15 +462,6 @@ class MainWindow(QMainWindow):
             elif sprint_text == "Backlog" and task.in_sprint:
                 match_sprint = False
                 
-            # La vue par défaut rassemble les tâches du jour et les tâches non terminées.
-            if status_text == "Tous":
-                is_today = any(
-                    task_date and task_date.date() == today
-                    for task_date in (task.start_date, task.end_date)
-                )
-                if task.status == 'completed' and not is_today:
-                    continue
-
             # Masquer les tâches terminées par défaut si le paramètre est actif
             if status_text == "Tous" and hide_completed and task.status == 'completed':
                 continue
@@ -624,7 +614,7 @@ class MainWindow(QMainWindow):
             menu.addAction(delete_action)
         else:
             status_menu = menu.addMenu(f"🔄 Changer le statut ({len(tasks)} tâches)")
-            for status_value, status_label in [('pending', 'En attente'), ('in_progress', 'En cours'), ('completed', 'Terminée'), ('cancelled', 'Annulée')]:
+            for status_value, status_label in [('pending', 'En attente'), ('in_progress', 'En cours'), ('blocked', 'Bloquée'), ('completed', 'Terminée'), ('cancelled', 'Annulée')]:
                 action = QAction(status_label, self)
                 action.triggered.connect(lambda checked=False, ts=tasks, s=status_value: self.change_tasks_status(ts, s))
                 status_menu.addAction(action)
@@ -640,8 +630,7 @@ class MainWindow(QMainWindow):
         if task:
             dialog = TaskDialog(self.task_service, self.project_service, task, self.settings_service, self)
             if dialog.exec() == TaskDialog.Accepted:
-                self.load_tasks()
-                self.filter_tasks() # Réapplique le filtre après édition
+                self.load_data()
                 
     def edit_task_by_index(self, index):
         """Modifie une tâche suite à un double-clic dans le tableau"""
@@ -653,21 +642,20 @@ class MainWindow(QMainWindow):
     def complete_task(self, task):
         """Marque une tâche comme terminée"""
         if self.task_service.mark_completed(task.id):
-            self.load_tasks()
-            self.update_chart()
+            self.load_data()
             QMessageBox.information(self, "Succès", "Tâche marquée comme terminée")
 
     def change_task_status(self, task, status):
         """Change le statut d'une tâche"""
         if self.task_service.update_task(task.id, status=status):
-            self.load_tasks()
+            self.load_data()
             self.update_chart()
             
     def change_tasks_status(self, tasks, status):
         """Change le statut de plusieurs tâches"""
         for task in tasks:
             self.task_service.update_task(task.id, status=status)
-        self.load_tasks()
+        self.load_data()
         self.update_chart()
         QMessageBox.information(self, "Succès", f"Statut mis à jour pour {len(tasks)} tâches")
     
