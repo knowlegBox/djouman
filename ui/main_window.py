@@ -119,8 +119,9 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QListWidget
         self.projects_list = QListWidget()
         self.projects_list.setStyleSheet("QListWidget { background: transparent; border: none; } QListWidget::item { padding: 5px; }")
-        self.projects_list.setToolTip("Double-cliquez sur un projet pour l'ouvrir dans votre éditeur")
+        self.projects_list.setToolTip("Double-cliquez pour ouvrir dans l'éditeur. Un simple clic filtre les tâches.")
         self.projects_list.itemDoubleClicked.connect(self.open_project_in_vscode)
+        self.projects_list.itemClicked.connect(self.select_project_from_sidebar)
         sidebar_layout.addWidget(self.projects_list)
         
         sidebar_layout.addStretch()
@@ -137,6 +138,12 @@ class MainWindow(QMainWindow):
         topbar.setFixedHeight(60)
         topbar.setObjectName("topbar")
         topbar_layout = QHBoxLayout(topbar)
+        
+        self.toggle_sidebar_btn = QPushButton("☰")
+        self.toggle_sidebar_btn.setFixedSize(35, 35)
+        self.toggle_sidebar_btn.setStyleSheet("font-size: 18px; border: none; background: transparent;")
+        self.toggle_sidebar_btn.clicked.connect(self.toggle_sidebar)
+        topbar_layout.addWidget(self.toggle_sidebar_btn)
         
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Rechercher une tâche...")
@@ -293,6 +300,18 @@ class MainWindow(QMainWindow):
         self.showNormal()
         self.load_data()
         
+    def toggle_sidebar(self):
+        """Affiche ou masque la barre latérale"""
+        self.sidebar.setVisible(not self.sidebar.isVisible())
+        
+    def select_project_from_sidebar(self, item):
+        """Filtre les tâches quand on clique sur un projet dans la liste"""
+        project_name = item.data(Qt.UserRole + 1)
+        if project_name:
+            idx = self.project_filter.findText(project_name)
+            if idx >= 0:
+                self.project_filter.setCurrentIndex(idx)
+                
     def on_settings_changed(self):
         """Callback quand les paramètres sont modifiés"""
         self.apply_styles()
@@ -391,6 +410,7 @@ class MainWindow(QMainWindow):
             item = QListWidgetItem(f"● {project.name}{time_str}")
             item.setForeground(QColor(project.color or "#4edea3"))
             item.setData(Qt.UserRole, project.local_path)
+            item.setData(Qt.UserRole + 1, project.name)
             self.projects_list.addItem(item)
             
     def open_project_in_vscode(self, item):
