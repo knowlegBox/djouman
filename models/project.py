@@ -14,6 +14,7 @@ class Project(Base):
     name = Column(String(100), nullable=False, unique=True)
     description = Column(Text)
     repo_url = Column(String(255))
+    local_path = Column(String(500))
     default_branch = Column(String(100))
     tracker_url = Column(String(255))
     color = Column(String(7), default="#3498db")  # Code couleur hexadécimal

@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):
         # Action Buttons in Sidebar
         self.add_task_btn = QPushButton("➕ Nouvelle tâche")
         self.add_task_btn.setObjectName("primary_btn")
-        self.add_project_btn = QPushButton("📁 Nouvelle projet")
+        self.add_project_btn = QPushButton("📁 Nouveau projet")
         self.add_project_btn.setObjectName("secondary_btn")
         
         sidebar_layout.addWidget(self.add_task_btn)
@@ -119,6 +119,8 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QListWidget
         self.projects_list = QListWidget()
         self.projects_list.setStyleSheet("QListWidget { background: transparent; border: none; } QListWidget::item { padding: 5px; }")
+        self.projects_list.setToolTip("Double-cliquez sur un projet pour l'ouvrir dans votre éditeur")
+        self.projects_list.itemDoubleClicked.connect(self.open_project_in_vscode)
         sidebar_layout.addWidget(self.projects_list)
         
         sidebar_layout.addStretch()
@@ -388,7 +390,28 @@ class MainWindow(QMainWindow):
             
             item = QListWidgetItem(f"● {project.name}{time_str}")
             item.setForeground(QColor(project.color or "#4edea3"))
+            item.setData(Qt.UserRole, project.local_path)
             self.projects_list.addItem(item)
+            
+    def open_project_in_vscode(self, item):
+        """Ouvre le projet sélectionné dans l'éditeur configuré via subprocess"""
+        local_path = item.data(Qt.UserRole)
+        if not local_path:
+            return
+            
+        import os
+        import subprocess
+        from PySide6.QtWidgets import QMessageBox
+        
+        if os.path.exists(local_path):
+            try:
+                # shell=True est souvent nécessaire sur Windows pour trouver la commande dans le PATH
+                editor_cmd = self.settings_service.get("default_editor", "code")
+                subprocess.Popen([editor_cmd, local_path], shell=True)
+            except Exception as e:
+                QMessageBox.warning(self, "Erreur", f"Impossible d'ouvrir l'éditeur ({editor_cmd}) : {str(e)}")
+        else:
+            QMessageBox.warning(self, "Erreur", "Le dossier du projet n'existe plus à cet emplacement.")
     
     def add_task(self):
         """Ouvre le dialogue d'ajout de tâche"""
@@ -482,7 +505,7 @@ class MainWindow(QMainWindow):
                     
             # Filtre de projet
             match_project = True
-            if project_text != "Toutes les projets":
+            if project_text != "tous les projets":
                 cat_name = task.project.name if task.project else "Aucune"
                 if cat_name != project_text:
                     match_project = False

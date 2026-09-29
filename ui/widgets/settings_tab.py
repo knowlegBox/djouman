@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QFormLayout, 
                                QCheckBox, QComboBox, QGroupBox, QPushButton, QHBoxLayout,
-                               QMessageBox)
+                               QMessageBox, QLineEdit)
 from PySide6.QtCore import Signal
 
 class SettingsTab(QWidget):
@@ -26,6 +26,11 @@ class SettingsTab(QWidget):
         self.theme_combo.addItem("Mode Sombre (Djuma)", "dark")
         self.theme_combo.addItem("Mode Clair", "light")
         app_layout.addRow("Thème visuel:", self.theme_combo)
+        
+        self.editor_input = QLineEdit()
+        self.editor_input.setPlaceholderText("code, idea, pycharm, notepad...")
+        self.editor_input.setToolTip("Commande CLI pour ouvrir le projet (ex: code pour VS Code, idea pour IntelliJ)")
+        app_layout.addRow("Éditeur par défaut (CLI):", self.editor_input)
 
         # Groupe Notifications
         notif_group = QGroupBox("Notifications & Rappels")
@@ -86,6 +91,8 @@ class SettingsTab(QWidget):
         idx = self.theme_combo.findData(theme_val)
         if idx >= 0:
             self.theme_combo.setCurrentIndex(idx)
+            
+        self.editor_input.setText(self.settings_service.get("default_editor", "code"))
 
     def save_settings(self):
         """Sauvegarde les paramètres et notifie l'application"""
@@ -94,6 +101,9 @@ class SettingsTab(QWidget):
         self.settings_service.set("snooze_delay_minutes", self.snooze_combo.currentData())
         self.settings_service.set("default_duration_minutes", self.duration_combo.currentData())
         self.settings_service.set("theme", self.theme_combo.currentData())
+        
+        editor = self.editor_input.text().strip()
+        self.settings_service.set("default_editor", editor if editor else "code")
         
         QMessageBox.information(self, "Succès", "Les paramètres ont été sauvegardés.")
         self.settings_changed.emit()

@@ -3,12 +3,45 @@ Dialogue de gestion des projets
 """
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
                                QLineEdit, QTextEdit, QComboBox, QPushButton, 
-                               QGroupBox, QColorDialog, QLabel, QDateEdit)
-from PySide6.QtCore import Qt, QDate
+                               QGroupBox, QColorDialog, QLabel, QDateEdit, QFileDialog, QMessageBox, QProgressDialog)
+from PySide6.QtCore import Qt, QDate, QThread, Signal
 from PySide6.QtGui import QColor
+import subprocess
+import os
 from services import ProjectService
 from models import Project
 from config.settings import CATEGORY_COLORS
+
+class CloneThread(QThread):
+    finished_signal = Signal(bool, str, str)
+
+    def __init__(self, repo_url, parent_dir):
+        super().__init__()
+        self.repo_url = repo_url
+        self.parent_dir = parent_dir
+
+    def run(self):
+        import re
+        try:
+            print(f"\n🔄 Démarrage du clonage de {self.repo_url}...")
+            print(f"📂 Dossier de destination : {self.parent_dir}")
+            
+            result = subprocess.run(["git", "clone", self.repo_url], cwd=self.parent_dir, check=True, capture_output=True, text=True)
+            match = re.search(r'/([^/]+?)(?:\.git)?$', self.repo_url)
+            local_path = ""
+            if match:
+                repo_name = match.group(1)
+                local_path = os.path.join(self.parent_dir, repo_name)
+                
+            print(f"✅ Clonage réussi avec succès dans : {local_path}")
+            self.finished_signal.emit(True, "Succès", local_path)
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Erreur Git lors du clonage : {e.stderr}")
+            self.finished_signal.emit(False, f"Erreur Git: {e.stderr}", "")
+        except Exception as e:
+            print(f"❌ Erreur inattendue lors du clonage : {str(e)}")
+            self.finished_signal.emit(False, f"Erreur inattendue: {str(e)}", "")
+
 
 class ProjectDialog(QDialog):
     """Dialogue pour créer ou modifier un projet"""
@@ -50,6 +83,16 @@ class ProjectDialog(QDialog):
         self.repo_url_input = QLineEdit()
         self.repo_url_input.setPlaceholderText("https://github.com/user/repo")
         form_layout.addRow("Repository URL:", self.repo_url_input)
+        
+        # Local Path
+        self.local_path_layout = QHBoxLayout()
+        self.local_path_input = QLineEdit()
+        self.local_path_input.setPlaceholderText("C:/chemin/vers/le/projet")
+        self.browse_btn = QPushButton("📁")
+        self.browse_btn.setFixedWidth(30)
+        self.local_path_layout.addWidget(self.local_path_input)
+        self.local_path_layout.addWidget(self.browse_btn)
+        form_layout.addRow("Chemin Local:", self.local_path_layout)
         
         # Default Branch
         self.default_branch_input = QLineEdit()
@@ -109,6 +152,13 @@ class ProjectDialog(QDialog):
         self.color_combo.currentTextChanged.connect(self.update_color_preview)
         self.color_picker_btn.clicked.connect(self.pick_color)
         self.repo_url_input.textChanged.connect(self.on_repo_url_changed)
+        self.browse_btn.clicked.connect(self.browse_local_path)
+    
+    def browse_local_path(self):
+        """Ouvre un dialogue pour choisir le dossier du projet"""
+        directory = QFileDialog.getExistingDirectory(self, "Sélectionner le dossier du projet")
+        if directory:
+            self.local_path_input.setText(directory)
     
     def on_repo_url_changed(self, url):
         """Remplit automatiquement le nom du projet à partir de l'URL"""
@@ -127,6 +177,7 @@ class ProjectDialog(QDialog):
         self.name_input.setText(self.project.name)
         self.description_input.setPlainText(self.project.description or "")
         self.repo_url_input.setText(self.project.repo_url or "")
+        self.local_path_input.setText(self.project.local_path or "")
         self.default_branch_input.setText(self.project.default_branch or "")
         self.tracker_url_input.setText(self.project.tracker_url or "")
         self.status_combo.setCurrentText(self.project.status)
@@ -171,12 +222,57 @@ class ProjectDialog(QDialog):
             self.show_error("Le nom est obligatoire")
             return
         
+        repo_url = self.repo_url_input.text().strip()
+        local_path = self.local_path_input.text().strip()
+        
+        # Logique de clonage
+        if repo_url and not local_path and not self.project:
+            reply = QMessageBox.question(
+                self, 
+                "Cloner le dépôt ?", 
+                "Un lien GitHub a été détecté mais aucun chemin local n'est défini.\nVoulez-vous cloner ce dépôt maintenant ?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if reply == QMessageBox.Yes:
+                parent_dir = QFileDialog.getExistingDirectory(self, "Choisir le dossier parent pour le clone")
+                if parent_dir:
+                    self.progress = QProgressDialog("Clonage en cours... Veuillez patienter", None, 0, 0, self)
+                    self.progress.setWindowTitle("Téléchargement")
+                    self.progress.setWindowModality(Qt.WindowModal)
+                    self.progress.setCancelButton(None)
+                    self.progress.setMinimumDuration(0)  # Force l'affichage immédiat
+                    self.progress.show()
+                    
+                    self.clone_thread = CloneThread(repo_url, parent_dir)
+                    self.clone_thread.finished_signal.connect(self.on_clone_finished)
+                    self.clone_thread.start()
+                    return # Attendre la fin du clonage
+        
+        self.save_project_data()
+        
+    def on_clone_finished(self, success, msg, local_path):
+        if hasattr(self, 'progress'):
+            self.progress.close()
+            
+        if success:
+            self.local_path_input.setText(local_path)
+            QMessageBox.information(self, "Succès", f"Dépôt cloné avec succès dans :\n{local_path}")
+            self.save_project_data()
+        else:
+            self.show_error(msg)
+            
+    def save_project_data(self):
+        """Procède à la sauvegarde en base de données"""
+        name = self.name_input.text().strip()
+        
         if self.project:
             success = self.project_service.update_project(
                 self.project.id,
                 name=name,
                 description=self.description_input.toPlainText().strip(),
                 repo_url=self.repo_url_input.text().strip(),
+                local_path=self.local_path_input.text().strip(),
                 default_branch=self.default_branch_input.text().strip(),
                 tracker_url=self.tracker_url_input.text().strip(),
                 status=self.status_combo.currentText(),
@@ -189,6 +285,7 @@ class ProjectDialog(QDialog):
                 name=name,
                 description=self.description_input.toPlainText().strip(),
                 repo_url=self.repo_url_input.text().strip(),
+                local_path=self.local_path_input.text().strip(),
                 default_branch=self.default_branch_input.text().strip(),
                 tracker_url=self.tracker_url_input.text().strip(),
                 status=self.status_combo.currentText(),
