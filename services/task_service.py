@@ -64,7 +64,8 @@ class TaskService:
             session.close()
     
     def get_all_tasks(self) -> List[Task]:
-        """Récupère toutes les tâches"""
+        """Récupère toutes les tâches (après synchronisation des JSON locaux)"""
+        self.sync_all_projects()
         session = self.db_service.get_session()
         try:
             from sqlalchemy.orm import joinedload
@@ -74,6 +75,77 @@ class TaskService:
             return []
         finally:
             session.close()
+            
+    def sync_all_projects(self):
+        """Synchronise les fichiers .djouman.json vers SQLite pour tous les projets"""
+        session = self.db_service.get_session()
+        try:
+            from models.project import Project
+            projects = session.query(Project).filter(Project.local_path != None, Project.local_path != "").all()
+            for project in projects:
+                self._sync_project_tasks_internal(project, session)
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            print(f"Erreur globale de synchronisation JSON : {e}")
+        finally:
+            session.close()
+            
+    def _sync_project_tasks_internal(self, project, session):
+        """Logique interne pour synchroniser un projet spécifique"""
+        import os
+        if not os.path.exists(project.local_path):
+            return
+            
+        from .json_storage import JsonStorageService
+        json_service = JsonStorageService(project.local_path)
+        
+        # S'assurer que les fichiers IA (instructions et raccourci /djouman) existent toujours
+        json_service.setup_ai_integration()
+        
+        json_tasks = json_service.get_tasks()
+        
+        # Récupérer les tâches existantes
+        db_tasks = session.query(Task).filter(Task.project_id == project.id).all()
+        db_tasks_by_title = {t.title: t for t in db_tasks}
+        
+        for j_task in json_tasks:
+            title = j_task.get("title") or j_task.get("name")
+            if not title:
+                continue
+                
+            desc = j_task.get("description", "")
+            if "command" in j_task:
+                desc = f"Commande: {j_task.get('command')}\n\n{desc}"
+                
+            status = j_task.get("status", "pending")
+            
+            # Map des priorités
+            priority_str = str(j_task.get("priority", "moyen")).lower()
+            priority_map = {"faible": 1, "moyen": 2, "élevé": 3}
+            priority = priority_map.get(priority_str, 2)
+            
+            task_type = j_task.get("type", "feature")
+            
+            if title in db_tasks_by_title:
+                db_task = db_tasks_by_title[title]
+                # Mettre à jour si nécessaire
+                if db_task.status != status or db_task.description != desc:
+                    db_task.description = desc
+                    db_task.status = status
+                    db_task.priority = priority
+                    db_task.task_type = task_type
+            else:
+                # Créer la nouvelle tâche
+                new_task = Task(
+                    title=title,
+                    description=desc,
+                    status=status,
+                    priority=priority,
+                    task_type=task_type,
+                    project_id=project.id
+                )
+                session.add(new_task)
     
     def get_tasks_by_status(self, status: str) -> List[Task]:
         """Récupère les tâches par statut"""
@@ -112,6 +184,30 @@ class TaskService:
                     setattr(task, key, value)
             
             session.commit()
+            
+            # Synchronisation retour vers le fichier .djouman.json
+            if getattr(task, 'project', None) and task.project.local_path:
+                import os
+                if os.path.exists(task.project.local_path):
+                    from .json_storage import JsonStorageService
+                    json_service = JsonStorageService(task.project.local_path)
+                    
+                    json_data = json_service.read_data()
+                    json_tasks = json_data.get("tasks", [])
+                    
+                    for jt in json_tasks:
+                        title_or_name = jt.get("title") or jt.get("name")
+                        if title_or_name == task.title:
+                            jt["status"] = task.status
+                            if task.start_date:
+                                jt["start_date"] = task.start_date.isoformat()
+                            if task.end_date:
+                                jt["end_date"] = task.end_date.isoformat()
+                            break
+                            
+                    json_data["tasks"] = json_tasks
+                    json_service.write_data(json_data)
+                    
             return True
         except SQLAlchemyError as e:
             session.rollback()
