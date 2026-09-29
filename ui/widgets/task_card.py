@@ -84,11 +84,11 @@ class TaskCard(QFrame):
         
         # Bouton Timer (plus petit)
         from PySide6.QtWidgets import QPushButton
-        self.timer_btn = QPushButton("▶️")
+        self.timer_btn = QPushButton("▶")
         self.timer_btn.setFixedSize(20, 20)
         self.timer_btn.setToolTip("Démarrer le chronomètre")
         self.timer_btn.setStyleSheet("""
-            QPushButton { background-color: transparent; border: 1px solid #3c4a42; border-radius: 10px; font-size: 8px;}
+            QPushButton { background-color: transparent; border: 1px solid #3c4a42; border-radius: 10px; font-size: 10px; color: #4edea3; padding-left: 2px;}
             QPushButton:hover { background-color: #242c27; border-color: #4edea3; }
         """)
         self.timer_btn.clicked.connect(self.on_timer_clicked)

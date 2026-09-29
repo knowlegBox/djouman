@@ -109,16 +109,56 @@ class TaskService:
         db_tasks = session.query(Task).filter(Task.project_id == project.id).all()
         db_tasks_by_title = {t.title: t for t in db_tasks}
         
-        for j_task in json_tasks:
+        # Fonction pour aplatir les tâches (support des epics)
+        def extract_tasks(node, epic_name=None):
+            extracted = []
+            if isinstance(node, dict):
+                title = node.get("title") or node.get("name")
+                if title:
+                    task_copy = node.copy()
+                    if epic_name:
+                        task_copy["epic_name"] = epic_name
+                    extracted.append(task_copy)
+                
+                if "tasks" in node and isinstance(node["tasks"], list):
+                    current_epic = node.get("epic") or epic_name
+                    for subnode in node["tasks"]:
+                        extracted.extend(extract_tasks(subnode, current_epic))
+            elif isinstance(node, list):
+                for item in node:
+                    extracted.extend(extract_tasks(item, epic_name))
+            return extracted
+            
+        flattened_tasks = extract_tasks(json_tasks)
+        
+        for j_task in flattened_tasks:
             title = j_task.get("title") or j_task.get("name")
             if not title:
                 continue
                 
             desc = j_task.get("description", "")
+            epic_name = j_task.get("epic_name")
+            if epic_name:
+                desc = f"[Épopée: {epic_name}]\n{desc}"
+                
             if "command" in j_task:
                 desc = f"Commande: {j_task.get('command')}\n\n{desc}"
                 
-            status = j_task.get("status", "pending")
+            # Extraire les sous-tâches (subtasks) du JSON en texte
+            if "subtasks" in j_task and isinstance(j_task["subtasks"], list):
+                subtasks_str = "\n".join([f"- {st}" for st in j_task["subtasks"] if isinstance(st, str)])
+                if subtasks_str:
+                    desc = f"{desc}\n\nSous-tâches:\n{subtasks_str}"
+                
+            raw_status = j_task.get("status", "pending").lower()
+            if raw_status == "todo":
+                status = "pending"
+            elif raw_status == "done":
+                status = "completed"
+            elif raw_status == "in progress":
+                status = "in_progress"
+            else:
+                status = raw_status
             
             # Map des priorités
             priority_str = str(j_task.get("priority", "moyen")).lower()
@@ -139,7 +179,7 @@ class TaskService:
                 # Créer la nouvelle tâche
                 new_task = Task(
                     title=title,
-                    description=desc,
+                    description=desc.strip(),
                     status=status,
                     priority=priority,
                     task_type=task_type,
@@ -195,15 +235,30 @@ class TaskService:
                     json_data = json_service.read_data()
                     json_tasks = json_data.get("tasks", [])
                     
-                    for jt in json_tasks:
-                        title_or_name = jt.get("title") or jt.get("name")
-                        if title_or_name == task.title:
-                            jt["status"] = task.status
-                            if task.start_date:
-                                jt["start_date"] = task.start_date.isoformat()
-                            if task.end_date:
-                                jt["end_date"] = task.end_date.isoformat()
-                            break
+                    def update_json_task(nodes, target_title, new_status, new_start, new_end):
+                        if isinstance(nodes, list):
+                            for node in nodes:
+                                if update_json_task(node, target_title, new_status, new_start, new_end):
+                                    return True
+                        elif isinstance(nodes, dict):
+                            title = nodes.get("title") or nodes.get("name")
+                            if title == target_title:
+                                nodes["status"] = new_status
+                                if new_start: nodes["start_date"] = new_start
+                                if new_end: nodes["end_date"] = new_end
+                                return True
+                            
+                            if "tasks" in nodes:
+                                return update_json_task(nodes["tasks"], target_title, new_status, new_start, new_end)
+                        return False
+                        
+                    update_json_task(
+                        json_tasks, 
+                        task.title, 
+                        task.status, 
+                        task.start_date.isoformat() if task.start_date else None, 
+                        task.end_date.isoformat() if task.end_date else None
+                    )
                             
                     json_data["tasks"] = json_tasks
                     json_service.write_data(json_data)
