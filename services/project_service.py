@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from models.project import Project
 from .database import DatabaseService
+from .json_storage import JsonStorageService
 
 class ProjectService:
     """Service de gestion des projets"""
@@ -14,7 +15,7 @@ class ProjectService:
         self.db_service = db_service
     
     def create_project(self, name: str, description: str = None, repo_url: str = None,
-                       default_branch: str = None, tracker_url: str = None,
+                       local_path: str = None, default_branch: str = None, tracker_url: str = None,
                        color: str = "#3498db", status: str = "actif",
                        start_date=None, end_date=None) -> Optional[Project]:
         """Crée un nouveau projet"""
@@ -24,6 +25,7 @@ class ProjectService:
                 name=name,
                 description=description,
                 repo_url=repo_url,
+                local_path=local_path,
                 default_branch=default_branch,
                 tracker_url=tracker_url,
                 color=color,
@@ -34,6 +36,13 @@ class ProjectService:
             session.add(project)
             session.commit()
             session.refresh(project)
+            
+            # Création automatique du fichier .djouman.json et des intégrations IA
+            if project.local_path:
+                json_service = JsonStorageService(project.local_path)
+                json_service.ensure_file_exists(project.name)
+                json_service.setup_ai_integration()
+                
             return project
         except SQLAlchemyError as e:
             session.rollback()
