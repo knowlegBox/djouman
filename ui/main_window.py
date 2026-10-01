@@ -280,7 +280,7 @@ class MainWindow(QMainWindow):
         self.gantt_tab.gantt_widget.task_double_clicked.connect(self.edit_task_from_card)
         self.stacked_widget.addWidget(self.gantt_tab)
         
-        self.stacked_widget.setCurrentIndex(0)
+        self.stacked_widget.setCurrentIndex(4)
         
         # --- Focus Mode ---
         from ui.widgets.focus_widget import FocusModeWidget

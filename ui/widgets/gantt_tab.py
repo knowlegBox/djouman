@@ -11,7 +11,8 @@ class GanttWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.tasks = []
-        self.start_date = datetime.date.today() - datetime.timedelta(days=datetime.date.today().weekday())
+        # Commencer la vue Gantt 1 jour avant aujourd'hui pour bien voir le jour en cours
+        self.start_date = datetime.date.today() - datetime.timedelta(days=1)
         self.days_to_show = 28 # 4 weeks
         
         self.row_height = 40
