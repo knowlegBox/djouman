@@ -1,4 +1,4 @@
-# 🌙 Djuma - Focus & Task Management
+# 🌙 Djouman - Focus & Task Management
 
 **Djuma** est une application de productivité moderne conçue pour vous aider à rester concentré et à accomplir vos tâches sans distraction. Développée en Python avec **PySide6** et **SQLAlchemy**, elle combine une gestion de tâches classique avec une fonctionnalité de "Screen Blocker" innovante.
 
