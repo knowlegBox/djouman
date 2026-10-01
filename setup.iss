@@ -8,6 +8,8 @@ OutputBaseFilename=Install_Djouman
 Compression=lzma
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
+SetupIconFile=assets\icons\app_icon.ico
+UninstallDisplayIcon={app}\Djouman.exe
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked

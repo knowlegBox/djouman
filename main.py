@@ -12,6 +12,7 @@ sys.path.insert(0, str(root_dir))
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 from ui.main_window import MainWindow
 from services import DatabaseService, ProjectService, WorkSessionService
 from config.settings import DEFAULT_STYLES
@@ -21,10 +22,24 @@ from utils.startup import register_startup
 def setup_application():
     """Configure l'application Qt"""
     app = QApplication([])
-    app.setApplicationName("Todo List Manager")
+    app.setApplicationName("Djouman")
     app.setApplicationVersion("1.0.0")
-    app.setOrganizationName("TodoListApp")
+    app.setOrganizationName("Djouman")
     
+    # Configuration de l'icône de l'application
+    icon_path = os.path.join(os.path.dirname(__file__), "assets", "icons", "app_icon.png")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+    
+    # Assurer que Windows utilise bien l'icône dans la barre des tâches
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            myappid = 'com.kierie.djouman.1.0'
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        except Exception:
+            pass
+            
     # Configuration des styles
     app.setStyleSheet(DEFAULT_STYLES)
     
