@@ -56,7 +56,7 @@ class TaskService:
         session = self.db_service.get_session()
         try:
             from sqlalchemy.orm import joinedload
-            return session.query(Task).options(joinedload(Task.project), joinedload(Task.work_sessions)).filter(Task.id == task_id).first()
+            return session.query(Task).options(joinedload(Task.project), joinedload(Task.work_sessions), joinedload(Task.subtasks)).filter(Task.id == task_id).first()
         except SQLAlchemyError as e:
             print(f"Erreur lors de la récupération de la tâche : {e}")
             return None
@@ -69,7 +69,7 @@ class TaskService:
         session = self.db_service.get_session()
         try:
             from sqlalchemy.orm import joinedload
-            return session.query(Task).options(joinedload(Task.project), joinedload(Task.work_sessions)).order_by(Task.created_at.desc()).all()
+            return session.query(Task).options(joinedload(Task.project), joinedload(Task.work_sessions), joinedload(Task.subtasks)).order_by(Task.created_at.desc()).all()
         except SQLAlchemyError as e:
             print(f"Erreur lors de la récupération des tâches : {e}")
             return []
@@ -103,7 +103,10 @@ class TaskService:
         # S'assurer que les fichiers IA (instructions et raccourci /djouman) existent toujours
         json_service.setup_ai_integration()
         
-        json_tasks = json_service.get_tasks()
+        json_data = json_service.read_data()
+        json_tasks = json_data.get("tasks", [])
+        if not json_tasks and "epics" in json_data:
+            json_tasks = json_data.get("epics", [])
         
         # Récupérer les tâches existantes
         db_tasks = session.query(Task).filter(Task.project_id == project.id).all()
@@ -114,14 +117,16 @@ class TaskService:
             extracted = []
             if isinstance(node, dict):
                 title = node.get("title") or node.get("name")
-                if title:
+                has_tasks = "tasks" in node and isinstance(node["tasks"], list)
+                
+                if title and not has_tasks:
                     task_copy = node.copy()
                     if epic_name:
                         task_copy["epic_name"] = epic_name
                     extracted.append(task_copy)
                 
-                if "tasks" in node and isinstance(node["tasks"], list):
-                    current_epic = node.get("epic") or epic_name
+                if has_tasks:
+                    current_epic = node.get("epic") or title or epic_name
                     for subnode in node["tasks"]:
                         extracted.extend(extract_tasks(subnode, current_epic))
             elif isinstance(node, list):
@@ -143,12 +148,6 @@ class TaskService:
                 
             if "command" in j_task:
                 desc = f"Commande: {j_task.get('command')}\n\n{desc}"
-                
-            # Extraire les sous-tâches (subtasks) du JSON en texte
-            if "subtasks" in j_task and isinstance(j_task["subtasks"], list):
-                subtasks_str = "\n".join([f"- {st}" for st in j_task["subtasks"] if isinstance(st, str)])
-                if subtasks_str:
-                    desc = f"{desc}\n\nSous-tâches:\n{subtasks_str}"
                 
             raw_status = j_task.get("status", "pending").lower()
             if raw_status == "todo":
@@ -175,9 +174,10 @@ class TaskService:
                     db_task.status = status
                     db_task.priority = priority
                     db_task.task_type = task_type
+                current_task = db_task
             else:
                 # Créer la nouvelle tâche
-                new_task = Task(
+                current_task = Task(
                     title=title,
                     description=desc.strip(),
                     status=status,
@@ -185,14 +185,43 @@ class TaskService:
                     task_type=task_type,
                     project_id=project.id
                 )
-                session.add(new_task)
+                session.add(current_task)
+                session.flush() # Pour avoir l'ID
+                
+            if "duration" in j_task:
+                current_task.duration = j_task.get("duration")
+                
+            # Gérer les vraies sous-tâches (modèle SubTask)
+            if "subtasks" in j_task and isinstance(j_task["subtasks"], list):
+                from models.subtask import SubTask
+                existing_subtasks = session.query(SubTask).filter(SubTask.task_id == current_task.id).all()
+                existing_titles = {st.title: st for st in existing_subtasks}
+                
+                for st in j_task["subtasks"]:
+                    st_title = st if isinstance(st, str) else (st.get("title") or st.get("name"))
+                    if st_title and st_title not in existing_titles:
+                        new_st = SubTask(title=st_title, task_id=current_task.id)
+                        if isinstance(st, dict):
+                            if st.get("status", "").lower() in ["done", "completed"]:
+                                new_st.is_completed = True
+                            if "duration" in st:
+                                new_st.duration = st.get("duration")
+                        session.add(new_st)
+                        existing_titles[st_title] = new_st
+                    elif st_title in existing_titles:
+                        # Mise à jour si elle existe déjà
+                        if isinstance(st, dict):
+                            if "duration" in st:
+                                existing_titles[st_title].duration = st.get("duration")
+                            if st.get("status", "").lower() in ["done", "completed"]:
+                                existing_titles[st_title].is_completed = True
     
     def get_tasks_by_status(self, status: str) -> List[Task]:
         """Récupère les tâches par statut"""
         session = self.db_service.get_session()
         try:
             from sqlalchemy.orm import joinedload
-            return session.query(Task).options(joinedload(Task.project), joinedload(Task.work_sessions)).filter(Task.status == status).order_by(Task.created_at.desc()).all()
+            return session.query(Task).options(joinedload(Task.project), joinedload(Task.work_sessions), joinedload(Task.subtasks)).filter(Task.status == status).order_by(Task.created_at.desc()).all()
         except SQLAlchemyError as e:
             print(f"Erreur lors de la récupération des tâches : {e}")
             return []
@@ -204,7 +233,7 @@ class TaskService:
         session = self.db_service.get_session()
         try:
             from sqlalchemy.orm import joinedload
-            return session.query(Task).options(joinedload(Task.project), joinedload(Task.work_sessions)).filter(Task.project_id == project_id).order_by(Task.created_at.desc()).all()
+            return session.query(Task).options(joinedload(Task.project), joinedload(Task.work_sessions), joinedload(Task.subtasks)).filter(Task.project_id == project_id).order_by(Task.created_at.desc()).all()
         except SQLAlchemyError as e:
             print(f"Erreur lors de la récupération des tâches : {e}")
             return []
@@ -233,34 +262,36 @@ class TaskService:
                     json_service = JsonStorageService(task.project.local_path)
                     
                     json_data = json_service.read_data()
-                    json_tasks = json_data.get("tasks", [])
                     
-                    def update_json_task(nodes, target_title, new_status, new_start, new_end):
+                    def update_json_task(nodes, target_title, new_status, new_start, new_end, new_duration):
                         if isinstance(nodes, list):
                             for node in nodes:
-                                if update_json_task(node, target_title, new_status, new_start, new_end):
+                                if update_json_task(node, target_title, new_status, new_start, new_end, new_duration):
                                     return True
                         elif isinstance(nodes, dict):
                             title = nodes.get("title") or nodes.get("name")
-                            if title == target_title:
+                            if title == target_title and "tasks" not in nodes:
                                 nodes["status"] = new_status
                                 if new_start: nodes["start_date"] = new_start
                                 if new_end: nodes["end_date"] = new_end
+                                if new_duration is not None: nodes["duration"] = new_duration
                                 return True
                             
                             if "tasks" in nodes:
-                                return update_json_task(nodes["tasks"], target_title, new_status, new_start, new_end)
+                                return update_json_task(nodes["tasks"], target_title, new_status, new_start, new_end, new_duration)
                         return False
                         
-                    update_json_task(
-                        json_tasks, 
-                        task.title, 
-                        task.status, 
-                        task.start_date.isoformat() if task.start_date else None, 
-                        task.end_date.isoformat() if task.end_date else None
-                    )
+                    if "tasks" in json_data:
+                        update_json_task(json_data["tasks"], task.title, task.status, 
+                            task.start_date.isoformat() if task.start_date else None, 
+                            task.end_date.isoformat() if task.end_date else None,
+                            task.duration)
+                    elif "epics" in json_data:
+                        update_json_task(json_data["epics"], task.title, task.status, 
+                            task.start_date.isoformat() if task.start_date else None, 
+                            task.end_date.isoformat() if task.end_date else None,
+                            task.duration)
                             
-                    json_data["tasks"] = json_tasks
                     json_service.write_data(json_data)
                     
             return True
@@ -329,5 +360,96 @@ class TaskService:
         except SQLAlchemyError as e:
             print(f"Erreur lors du calcul des statistiques : {e}")
             return {}
+        finally:
+            session.close()
+    
+    def sync_subtasks_to_json(self, task_id: int):
+        """Synchronise les sous-tâches d'une tâche vers le fichier .djouman/tasks.json"""
+        session = self.db_service.get_session()
+        try:
+            from sqlalchemy.orm import joinedload
+            task = session.query(Task).options(joinedload(Task.project), joinedload(Task.subtasks)).filter(Task.id == task_id).first()
+            if not task or not task.project or not task.project.local_path:
+                return
+            
+            import os
+            if not os.path.exists(task.project.local_path):
+                return
+            
+            from .json_storage import JsonStorageService
+            json_service = JsonStorageService(task.project.local_path)
+            json_data = json_service.read_data()
+            
+            from models.subtask import SubTask
+            subtasks = session.query(SubTask).filter(SubTask.task_id == task_id).order_by(SubTask.id.asc()).all()
+            
+            # Construire la liste des sous-tâches au format dict pour l'IA
+            subtasks_json = []
+            for st in subtasks:
+                st_dict = {"title": st.title}
+                if st.is_completed:
+                    st_dict["status"] = "done"
+                else:
+                    st_dict["status"] = "pending"
+                if st.duration:
+                    st_dict["duration"] = st.duration
+                subtasks_json.append(st_dict)
+            
+            def update_subtasks_in_json(nodes, target_title, new_subtasks):
+                if isinstance(nodes, list):
+                    for node in nodes:
+                        if update_subtasks_in_json(node, target_title, new_subtasks):
+                            return True
+                elif isinstance(nodes, dict):
+                    title = nodes.get("title") or nodes.get("name")
+                    if title == target_title and "tasks" not in nodes:
+                        nodes["subtasks"] = new_subtasks
+                        return True
+                    if "tasks" in nodes:
+                        return update_subtasks_in_json(nodes["tasks"], target_title, new_subtasks)
+                return False
+            
+            if "tasks" in json_data:
+                update_subtasks_in_json(json_data["tasks"], task.title, subtasks_json)
+            elif "epics" in json_data:
+                update_subtasks_in_json(json_data["epics"], task.title, subtasks_json)
+            
+            json_service.write_data(json_data)
+        except Exception as e:
+            print(f"Erreur lors de la sync des sous-tâches vers JSON : {e}")
+        finally:
+            session.close()
+
+    def update_parent_task_dates(self, task_id: int):
+        """Met à jour les dates de la tâche parente en fonction de ses sous-tâches"""
+        session = self.db_service.get_session()
+        try:
+            from models.subtask import SubTask
+            task = session.query(Task).filter(Task.id == task_id).first()
+            if not task: return
+            
+            subtasks = session.query(SubTask).filter(SubTask.task_id == task_id).all()
+            if not subtasks: return
+            
+            starts = [st.start_date for st in subtasks if st.start_date]
+            ends = [st.end_date for st in subtasks if st.end_date]
+            
+            if starts:
+                task.start_date = min(starts)
+            if ends:
+                task.end_date = max(ends)
+            
+            if task.start_date and task.end_date:
+                diff = task.end_date - task.start_date
+                task.duration = int(diff.total_seconds() / 60)
+                
+            session.commit()
+            
+            # Update json sync if needed
+            self.update_task(task.id)
+            
+        except SQLAlchemyError as e:
+            session.rollback()
+            print(f"Erreur update_parent_task_dates : {e}")
         finally:
             session.close()
