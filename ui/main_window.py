@@ -86,16 +86,19 @@ class MainWindow(QMainWindow):
         self.nav_tasks_btn = QPushButton("📝 Tâches")
         self.nav_sprint_btn = QPushButton("🏃 Sprint & Backlog")
         self.nav_dashboard_btn = QPushButton("📊 Tableau de bord")
+        self.nav_gantt_btn = QPushButton("📅 Calendrier")
         self.nav_settings_btn = QPushButton("⚙️ Paramètres")
         
         self.nav_tasks_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
         self.nav_sprint_btn.clicked.connect(self.switch_to_sprint)
         self.nav_settings_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
         self.nav_dashboard_btn.clicked.connect(self.switch_to_dashboard)
+        self.nav_gantt_btn.clicked.connect(self.switch_to_gantt)
         
         sidebar_layout.addWidget(self.nav_tasks_btn)
         sidebar_layout.addWidget(self.nav_sprint_btn)
         sidebar_layout.addWidget(self.nav_dashboard_btn)
+        sidebar_layout.addWidget(self.nav_gantt_btn)
         sidebar_layout.addWidget(self.nav_settings_btn)
         
         sidebar_layout.addSpacing(20)
@@ -119,9 +122,11 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QListWidget
         self.projects_list = QListWidget()
         self.projects_list.setStyleSheet("QListWidget { background: transparent; border: none; } QListWidget::item { padding: 5px; }")
-        self.projects_list.setToolTip("Double-cliquez pour ouvrir dans l'éditeur. Un simple clic filtre les tâches.")
-        self.projects_list.itemDoubleClicked.connect(self.open_project_in_vscode)
+        self.projects_list.setToolTip("Double-cliquez pour ouvrir dans l'éditeur par défaut. Clic droit pour choisir.")
+        self.projects_list.itemDoubleClicked.connect(self.open_project_in_editor)
         self.projects_list.itemClicked.connect(self.select_project_from_sidebar)
+        self.projects_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.projects_list.customContextMenuRequested.connect(self.show_project_context_menu)
         sidebar_layout.addWidget(self.projects_list)
         
         sidebar_layout.addStretch()
@@ -269,6 +274,12 @@ class MainWindow(QMainWindow):
         self.sprint_board_tab = SprintBoardTab(self.task_service, self.project_service)
         self.stacked_widget.addWidget(self.sprint_board_tab)
         
+        # --- View 4: Gantt Chart ---
+        from ui.widgets.gantt_tab import GanttTab
+        self.gantt_tab = GanttTab(self.task_service)
+        self.gantt_tab.gantt_widget.task_double_clicked.connect(self.edit_task_from_card)
+        self.stacked_widget.addWidget(self.gantt_tab)
+        
         self.stacked_widget.setCurrentIndex(0)
         
         # --- Focus Mode ---
@@ -368,6 +379,9 @@ class MainWindow(QMainWindow):
     def switch_to_sprint(self):
         self.sprint_board_tab.refresh_data()
         self.stacked_widget.setCurrentIndex(3)
+        
+    def switch_to_gantt(self):
+        self.stacked_widget.setCurrentIndex(4)
     
     def load_tasks(self):
         """Charge la liste des tâches"""
@@ -392,6 +406,8 @@ class MainWindow(QMainWindow):
     
     def load_projects(self):
         """Charge la liste des projets"""
+        current_project_text = self.project_filter.currentText()
+        
         self.project_filter.clear()
         self.project_filter.addItem("Toutes les projets")
         self.projects_list.clear()
@@ -413,25 +429,59 @@ class MainWindow(QMainWindow):
             item.setData(Qt.UserRole + 1, project.name)
             self.projects_list.addItem(item)
             
-    def open_project_in_vscode(self, item):
-        """Ouvre le projet sélectionné dans l'éditeur configuré via subprocess"""
+        # Restore filter selection
+        idx = self.project_filter.findText(current_project_text)
+        if idx >= 0:
+            self.project_filter.setCurrentIndex(idx)
+            
+        # Restore sidebar list selection
+        for i in range(self.projects_list.count()):
+            item = self.projects_list.item(i)
+            if item.data(Qt.UserRole + 1) == current_project_text:
+                item.setSelected(True)
+                break
+            
+    def open_project_in_editor(self, item, editor_cmd=None):
+        """Ouvre le projet sélectionné dans l'éditeur spécifié via subprocess"""
         local_path = item.data(Qt.UserRole)
         if not local_path:
             return
             
         import os
         import subprocess
+        import shutil
         from PySide6.QtWidgets import QMessageBox
         
-        if os.path.exists(local_path):
-            try:
-                # shell=True est souvent nécessaire sur Windows pour trouver la commande dans le PATH
-                editor_cmd = self.settings_service.get("default_editor", "code")
-                subprocess.Popen([editor_cmd, local_path], shell=True)
-            except Exception as e:
-                QMessageBox.warning(self, "Erreur", f"Impossible d'ouvrir l'éditeur ({editor_cmd}) : {str(e)}")
-        else:
+        if not editor_cmd:
+            editors_str = self.settings_service.get("default_editor", "code")
+            editors = [e.strip() for e in editors_str.split(",") if e.strip()]
+            editor_cmd = editors[0] if editors else "code"
+            
+        if not os.path.exists(local_path):
             QMessageBox.warning(self, "Erreur", "Le dossier du projet n'existe plus à cet emplacement.")
+            return
+
+        # Recherche de l'exécutable absolu
+        cmd_path = shutil.which(editor_cmd)
+        if not cmd_path:
+            # Sur Windows, essayer explicitement avec .cmd (pour VS Code) ou .exe
+            cmd_path = shutil.which(f"{editor_cmd}.cmd") or shutil.which(f"{editor_cmd}.exe")
+            
+        if not cmd_path:
+            QMessageBox.warning(
+                self, 
+                "Éditeur introuvable", 
+                f"La commande '{editor_cmd}' n'a pas été trouvée sur votre système.\n\n"
+                "Assurez-vous que l'éditeur est installé et ajouté à vos variables d'environnement (PATH)."
+            )
+            return
+
+        try:
+            # Utilisation du chemin absolu avec shell=False est beaucoup plus fiable sur Windows
+            # On passe simplement le chemin du dossier comme argument
+            subprocess.Popen([cmd_path, local_path])
+        except Exception as e:
+            QMessageBox.warning(self, "Erreur critique", f"Une erreur est survenue lors de l'ouverture : {str(e)}")
     
     def add_task(self):
         """Ouvre le dialogue d'ajout de tâche"""
@@ -444,6 +494,49 @@ class MainWindow(QMainWindow):
         dialog = ProjectDialog(self.project_service, parent=self)
         if dialog.exec() == ProjectDialog.Accepted:
             self.load_projects()
+            
+    def show_project_context_menu(self, position):
+        """Affiche le menu contextuel pour la liste des projets"""
+        item = self.projects_list.itemAt(position)
+        if not item:
+            return
+            
+        from PySide6.QtWidgets import QMenu
+        from PySide6.QtGui import QAction
+        
+        menu = QMenu(self)
+        
+        edit_action = QAction("✏️ Modifier le projet", self)
+        edit_action.triggered.connect(lambda: self.edit_project_from_sidebar(item))
+        menu.addAction(edit_action)
+        
+        menu.addSeparator()
+        
+        editors_str = self.settings_service.get("default_editor", "code")
+        editors = [e.strip() for e in editors_str.split(",") if e.strip()]
+        if not editors:
+            editors = ["code"]
+            
+        for editor in editors:
+            open_action = QAction(f"💻 Ouvrir dans {editor}", self)
+            open_action.triggered.connect(lambda checked=False, e=editor, i=item: self.open_project_in_editor(i, e))
+            menu.addAction(open_action)
+        
+        menu.exec(self.projects_list.mapToGlobal(position))
+        
+    def edit_project_from_sidebar(self, item):
+        """Ouvre le dialogue de modification de projet pour le projet sélectionné"""
+        project_name = item.data(Qt.UserRole + 1)
+        if not project_name:
+            return
+            
+        projects = self.project_service.get_all_projects()
+        target_project = next((p for p in projects if p.name == project_name), None)
+        
+        if target_project:
+            dialog = ProjectDialog(self.project_service, project=target_project, parent=self)
+            if dialog.exec() == ProjectDialog.Accepted:
+                self.load_data()
     
     def edit_task_from_card(self, task):
         """Ouvre la boîte de dialogue pour éditer une tâche depuis la vue carte"""
@@ -540,6 +633,10 @@ class MainWindow(QMainWindow):
         # Mettre à jour la vue Kanban
         if hasattr(self, 'kanban_board'):
             self.kanban_board.set_tasks(filtered_tasks)
+            
+        # Mettre à jour la vue Gantt
+        if hasattr(self, 'gantt_tab'):
+            self.gantt_tab.set_tasks(filtered_tasks)
             
     def update_chart(self):
         """Met à jour le graphique des statistiques"""
