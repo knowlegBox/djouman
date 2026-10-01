@@ -28,9 +28,9 @@ class SettingsTab(QWidget):
         app_layout.addRow("Thème visuel:", self.theme_combo)
         
         self.editor_input = QLineEdit()
-        self.editor_input.setPlaceholderText("code, idea, pycharm, notepad...")
-        self.editor_input.setToolTip("Commande CLI pour ouvrir le projet (ex: code pour VS Code, idea pour IntelliJ)")
-        app_layout.addRow("Éditeur par défaut (CLI):", self.editor_input)
+        self.editor_input.setPlaceholderText("code, cursor, idea, pycharm...")
+        self.editor_input.setToolTip("Commandes CLI pour ouvrir le projet. La première sera utilisée par défaut pour le double-clic.")
+        app_layout.addRow("Éditeurs (séparés par des virgules):", self.editor_input)
 
         # Groupe Notifications
         notif_group = QGroupBox("Notifications & Rappels")

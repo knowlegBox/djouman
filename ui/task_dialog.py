@@ -103,6 +103,37 @@ class TaskDialog(QDialog):
         self.duration_input.setSuffix(" minutes")
         form_layout.addRow("Durée est.:", self.duration_input)
         
+        # Dates (Début et Fin)
+        from PySide6.QtWidgets import QDateTimeEdit
+        from PySide6.QtCore import QDateTime
+        
+        self.enable_start_date = QCheckBox("Planifier")
+        
+        dates_layout = QHBoxLayout()
+        self.start_date_input = QDateTimeEdit(QDateTime.currentDateTime())
+        self.start_date_input.setCalendarPopup(True)
+        self.start_date_input.setEnabled(False)
+        self.start_date_input.setDisplayFormat("dd/MM/yyyy HH:mm")
+        
+        self.end_date_input = QDateTimeEdit(QDateTime.currentDateTime())
+        self.end_date_input.setCalendarPopup(True)
+        self.end_date_input.setEnabled(False)
+        self.end_date_input.setDisplayFormat("dd/MM/yyyy HH:mm")
+        
+        dates_layout.addWidget(QLabel("Début:"))
+        dates_layout.addWidget(self.start_date_input)
+        dates_layout.addWidget(QLabel("Fin:"))
+        dates_layout.addWidget(self.end_date_input)
+        
+        self.enable_start_date.toggled.connect(self.start_date_input.setEnabled)
+        self.enable_start_date.toggled.connect(self.end_date_input.setEnabled)
+        
+        form_layout.addRow(self.enable_start_date, dates_layout)
+        
+        # Auto-calcul de la date de fin
+        self.duration_input.valueChanged.connect(self.calculate_end_date)
+        self.start_date_input.dateTimeChanged.connect(self.calculate_end_date)
+        
         self.tabs = QTabWidget()
         self.tabs.addTab(form_group, "Détails")
         
@@ -123,13 +154,15 @@ class TaskDialog(QDialog):
         if self.task:
             self.tabs.addTab(self.time_tab, "Temps de travail")
             
-            # Onglet Sous-tâches
-            self.subtask_tab = QWidget()
-            subtask_layout = QVBoxLayout(self.subtask_tab)
-            
+        # Onglet Sous-tâches (toujours visible)
+        self.subtask_tab = QWidget()
+        subtask_layout = QVBoxLayout(self.subtask_tab)
+        
+        if self.task:
             add_layout = QHBoxLayout()
             self.subtask_input = QLineEdit()
             self.subtask_input.setPlaceholderText("Nouvelle sous-tâche...")
+            self.subtask_input.returnPressed.connect(self.add_subtask)
             self.add_subtask_btn = QPushButton("Ajouter")
             add_layout.addWidget(self.subtask_input)
             add_layout.addWidget(self.add_subtask_btn)
@@ -140,8 +173,16 @@ class TaskDialog(QDialog):
             
             self.add_subtask_btn.clicked.connect(self.add_subtask)
             self.subtasks_list.itemChanged.connect(self.subtask_toggled)
+        else:
+            # Mode création : onglet désactivé avec message
+            placeholder_label = QLabel("💡 Sauvegardez d'abord la tâche pour ajouter des sous-tâches.")
+            placeholder_label.setAlignment(Qt.AlignCenter)
+            placeholder_label.setStyleSheet("color: #86948a; font-style: italic; padding: 40px;")
+            subtask_layout.addStretch()
+            subtask_layout.addWidget(placeholder_label)
+            subtask_layout.addStretch()
             
-            self.tabs.addTab(self.subtask_tab, "Sous-tâches")
+        self.tabs.addTab(self.subtask_tab, "Sous-tâches")
             
         layout.addWidget(self.tabs)
         
@@ -198,6 +239,15 @@ class TaskDialog(QDialog):
                 break
         
         self.duration_input.setValue(self.task.duration or 0)
+        
+        from PySide6.QtCore import QDateTime
+        if hasattr(self.task, 'start_date') and self.task.start_date:
+            self.enable_start_date.setChecked(True)
+            self.start_date_input.setDateTime(self.task.start_date)
+            if hasattr(self.task, 'end_date') and self.task.end_date:
+                self.end_date_input.setDateTime(self.task.end_date)
+            else:
+                self.calculate_end_date()
         
         if self.task.project_id:
             for i in range(self.project_combo.count()):
@@ -275,7 +325,9 @@ class TaskDialog(QDialog):
             'is_blocked': self.blocked_checkbox.isChecked(),
             'blocked_reason': self.blocked_reason.text().strip() if self.blocked_checkbox.isChecked() else "",
             'duration': duration,
-            'project_id': self.project_combo.currentData()
+            'project_id': self.project_combo.currentData(),
+            'start_date': self.start_date_input.dateTime().toPython() if self.enable_start_date.isChecked() else None,
+            'end_date': self.end_date_input.dateTime().toPython() if self.enable_start_date.isChecked() else None
         }
         
         if self.task:
@@ -293,7 +345,7 @@ class TaskDialog(QDialog):
         QMessageBox.warning(self, "Erreur", message)
         
     def load_subtasks(self):
-        """Charge les sous-tâches dans la liste"""
+        """Charge les sous-tâches dans la liste avec bouton × de suppression"""
         if not self.task: return
         self.subtasks_list.blockSignals(True)
         self.subtasks_list.clear()
@@ -303,35 +355,70 @@ class TaskDialog(QDialog):
         from models.subtask import SubTask
         subtasks = session.query(SubTask).filter(SubTask.task_id == self.task.id).order_by(SubTask.id.asc()).all()
         
-        from PySide6.QtWidgets import QListWidgetItem
-        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QListWidgetItem, QPushButton as QPB
+        from PySide6.QtCore import Qt, QSize
+        from functools import partial
         for st in subtasks:
-            item = QListWidgetItem(st.title)
+            item = QListWidgetItem()
+            item.setText(st.title)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Checked if st.is_completed else Qt.Unchecked)
             item.setData(Qt.UserRole, st.id)
+            # Réserver de l'espace pour le bouton ×
+            item.setSizeHint(QSize(0, 28))
             self.subtasks_list.addItem(item)
+            
+            # Bouton × de suppression
+            del_btn = QPB("×")
+            del_btn.setFixedSize(22, 22)
+            del_btn.setToolTip("Supprimer cette sous-tâche")
+            del_btn.setStyleSheet("""
+                QPushButton { background: transparent; color: #e74c3c; border: none; font-size: 14px; font-weight: bold; }
+                QPushButton:hover { background: rgba(231, 76, 60, 0.15); border-radius: 4px; }
+            """)
+            del_btn.clicked.connect(partial(self.delete_subtask, st.id, st.title))
+            
+            # Aligner le bouton à droite via un widget wrapper
+            from PySide6.QtWidgets import QWidget, QHBoxLayout
+            wrapper = QWidget()
+            wrapper_layout = QHBoxLayout(wrapper)
+            wrapper_layout.setContentsMargins(0, 0, 4, 0)
+            wrapper_layout.addStretch()
+            wrapper_layout.addWidget(del_btn)
+            self.subtasks_list.setItemWidget(item, wrapper)
             
         self.subtasks_list.blockSignals(False)
         session.close()
 
     def add_subtask(self):
-        """Ajoute une sous-tâche"""
+        """Ajoute une sous-tâche et synchronise vers le JSON"""
         title = self.subtask_input.text().strip()
         if not title or not self.task: return
         
         session = self.task_service.db_service.get_session()
         from models.subtask import SubTask
         st = SubTask(title=title, task_id=self.task.id)
+        
+        # Hériter des dates de la tâche parente
+        if self.task.start_date:
+            st.start_date = self.task.start_date
+        if self.task.end_date:
+            st.end_date = self.task.end_date
+        if self.task.duration:
+            st.duration = self.task.duration
+            
         session.add(st)
         session.commit()
         session.close()
         
         self.subtask_input.clear()
         self.load_subtasks()
+        
+        # Sync bidirectionnelle vers le JSON
+        self.task_service.sync_subtasks_to_json(self.task.id)
 
     def subtask_toggled(self, item):
-        """Met à jour le statut de la sous-tâche"""
+        """Met à jour le statut de la sous-tâche et synchronise vers le JSON"""
         st_id = item.data(Qt.UserRole)
         is_completed = (item.checkState() == Qt.Checked)
         
@@ -342,3 +429,42 @@ class TaskDialog(QDialog):
             st.is_completed = is_completed
             session.commit()
         session.close()
+        
+        # Sync bidirectionnelle vers le JSON
+        self.task_service.sync_subtasks_to_json(self.task.id)
+
+    def delete_subtask(self, st_id, st_title):
+        """Supprime une sous-tâche après confirmation"""
+        from PySide6.QtWidgets import QMessageBox
+        reply = QMessageBox.question(
+            self, "Confirmation",
+            f"Supprimer la sous-tâche « {st_title} » ?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+        
+        session = self.task_service.db_service.get_session()
+        from models.subtask import SubTask
+        st = session.query(SubTask).filter(SubTask.id == st_id).first()
+        if st:
+            session.delete(st)
+            session.commit()
+        session.close()
+        
+        self.load_subtasks()
+        
+        # Sync bidirectionnelle vers le JSON
+        self.task_service.sync_subtasks_to_json(self.task.id)
+
+    def calculate_end_date(self):
+        """Calcule automatiquement la date de fin en fonction de la date de début et de la durée"""
+        if self.duration_input.value() > 0:
+            start_dt = self.start_date_input.dateTime()
+            # On ajoute la durée en minutes (durée * 60 secondes)
+            end_dt = start_dt.addSecs(self.duration_input.value() * 60)
+            self.end_date_input.blockSignals(True)
+            self.end_date_input.setDateTime(end_dt)
+            self.end_date_input.blockSignals(False)
+

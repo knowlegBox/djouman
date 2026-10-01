@@ -43,6 +43,16 @@ class TaskCard(QFrame):
         
         layout.addLayout(top_layout)
         
+        # Compteur de sous-tâches (si applicable)
+        if hasattr(self.task, 'subtasks') and self.task.subtasks:
+            total = len(self.task.subtasks)
+            done = sum(1 for st in self.task.subtasks if st.is_completed)
+            self.subtask_label = QLabel(f"☑ {done}/{total} sous-tâches")
+            self.subtask_label.setObjectName("subtaskLabel")
+            self.subtask_label.setFont(QFont("Inter", 8))
+            self.subtask_label.setStyleSheet("color: #4edea3; padding-left: 2px;")
+            layout.addWidget(self.subtask_label)
+        
         # Ligne 2 : Projet, Niveau, et Timer
         bottom_layout = QHBoxLayout()
         bottom_layout.setContentsMargins(0, 0, 0, 0)
