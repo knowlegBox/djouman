@@ -382,6 +382,12 @@ class TaskService:
             
             from models.subtask import SubTask
             subtasks = session.query(SubTask).filter(SubTask.task_id == task_id).order_by(SubTask.id.asc()).all()
+            for st in subtasks:
+                if st.start_date is not None and st.duration is not None and st.end_date is None:
+                    st.refresh_end_date()
+                elif st.start_date is not None and st.end_date is not None and st.duration is None:
+                    st.refresh_duration_from_dates()
+            session.commit()
             
             # Construire la liste des sous-tâches au format dict pour l'IA
             subtasks_json = []
@@ -391,7 +397,11 @@ class TaskService:
                     st_dict["status"] = "done"
                 else:
                     st_dict["status"] = "pending"
-                if st.duration:
+                if st.start_date is not None:
+                    st_dict["start_date"] = st.start_date.isoformat()
+                if st.end_date is not None:
+                    st_dict["end_date"] = st.end_date.isoformat()
+                if st.duration is not None:
                     st_dict["duration"] = st.duration
                 subtasks_json.append(st_dict)
             
@@ -420,6 +430,7 @@ class TaskService:
         finally:
             session.close()
 
+
     def update_parent_task_dates(self, task_id: int):
         """Met à jour les dates de la tâche parente en fonction de ses sous-tâches"""
         session = self.db_service.get_session()
@@ -430,6 +441,12 @@ class TaskService:
             
             subtasks = session.query(SubTask).filter(SubTask.task_id == task_id).all()
             if not subtasks: return
+
+            for st in subtasks:
+                if st.start_date is not None and st.duration is not None and st.end_date is None:
+                    st.refresh_end_date()
+                elif st.start_date is not None and st.end_date is not None and st.duration is None:
+                    st.refresh_duration_from_dates()
             
             starts = [st.start_date for st in subtasks if st.start_date]
             ends = [st.end_date for st in subtasks if st.end_date]
