@@ -113,7 +113,7 @@ class JsonStorageService:
             "# Initialisation de Djouman\n\n"
             "Lorsque l'utilisateur fait appel à toi via `/djouman`, tu dois :\n"
             "1. Prendre connaissance des règles écrites dans `.djouman/instructions.md`.\n"
-            "2. Demander la permission à l'utilisateur : 'Veux-tu que j'analyse ce projet pour générer les tâches Djouman ?'\n"
+            "2. Demander la permission à l'utilisateur : 'Veux-tu que j'analyse ce projet pour générer les tâches pour ce projet ?'\n"
             "3. Si oui, analyse le README et le code, puis mets à jour `.djouman/tasks.json`.\n"
         )
         

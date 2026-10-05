@@ -1,6 +1,7 @@
 """
 Dialogue de création et modification de tâches
 """
+import datetime
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
                                QLineEdit, QTextEdit, QSpinBox, QComboBox, 
                                QDateTimeEdit, QPushButton, QLabel, QGroupBox, QCheckBox,
@@ -167,6 +168,29 @@ class TaskDialog(QDialog):
             add_layout.addWidget(self.subtask_input)
             add_layout.addWidget(self.add_subtask_btn)
             subtask_layout.addLayout(add_layout)
+
+            self.subtask_time_layout = QHBoxLayout()
+            self.subtask_start_input = QDateTimeEdit(QDateTime.currentDateTime())
+            self.subtask_start_input.setCalendarPopup(True)
+            self.subtask_start_input.setDisplayFormat("dd/MM/yyyy HH:mm")
+            self.subtask_duration_input = QSpinBox()
+            self.subtask_duration_input.setRange(0, 9999)
+            self.subtask_duration_input.setSuffix(" min")
+            self.subtask_duration_input.setValue(30)
+            self.subtask_end_input = QDateTimeEdit(QDateTime.currentDateTime())
+            self.subtask_end_input.setCalendarPopup(True)
+            self.subtask_end_input.setDisplayFormat("dd/MM/yyyy HH:mm")
+            self.subtask_end_input.setEnabled(False)
+            self.subtask_time_layout.addWidget(QLabel("Début:"))
+            self.subtask_time_layout.addWidget(self.subtask_start_input)
+            self.subtask_time_layout.addWidget(QLabel("Durée:"))
+            self.subtask_time_layout.addWidget(self.subtask_duration_input)
+            self.subtask_time_layout.addWidget(QLabel("Fin:"))
+            self.subtask_time_layout.addWidget(self.subtask_end_input)
+            self.subtask_start_input.dateTimeChanged.connect(self.calculate_subtask_end_date)
+            self.subtask_duration_input.valueChanged.connect(self.calculate_subtask_end_date)
+            self.calculate_subtask_end_date()
+            subtask_layout.addLayout(self.subtask_time_layout)
             
             self.subtasks_list = QListWidget()
             subtask_layout.addWidget(self.subtasks_list)
@@ -360,7 +384,13 @@ class TaskDialog(QDialog):
         from functools import partial
         for st in subtasks:
             item = QListWidgetItem()
-            item.setText(st.title)
+            start_text = st.start_date.strftime("%d/%m/%Y %H:%M") if st.start_date else "—"
+            end_text = st.end_date.strftime("%d/%m/%Y %H:%M") if st.end_date else "—"
+            duration_text = f"{st.duration} min" if st.duration is not None else ""
+            item_text = f"{st.title}  [{start_text} → {end_text}]"
+            if duration_text:
+                item_text += f"  ({duration_text})"
+            item.setText(item_text)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Checked if st.is_completed else Qt.Unchecked)
             item.setData(Qt.UserRole, st.id)
@@ -390,6 +420,15 @@ class TaskDialog(QDialog):
         self.subtasks_list.blockSignals(False)
         session.close()
 
+    def calculate_subtask_end_date(self):
+        """Calcule automatiquement la date de fin de la sous-tâche."""
+        start_dt = self.subtask_start_input.dateTime().toPython()
+        duration_minutes = self.subtask_duration_input.value()
+        end_dt = start_dt + datetime.timedelta(minutes=duration_minutes)
+        self.subtask_end_input.blockSignals(True)
+        self.subtask_end_input.setDateTime(end_dt)
+        self.subtask_end_input.blockSignals(False)
+
     def add_subtask(self):
         """Ajoute une sous-tâche et synchronise vers le JSON"""
         title = self.subtask_input.text().strip()
@@ -398,15 +437,11 @@ class TaskDialog(QDialog):
         session = self.task_service.db_service.get_session()
         from models.subtask import SubTask
         st = SubTask(title=title, task_id=self.task.id)
-        
-        # Hériter des dates de la tâche parente
-        if self.task.start_date:
-            st.start_date = self.task.start_date
-        if self.task.end_date:
-            st.end_date = self.task.end_date
-        if self.task.duration:
-            st.duration = self.task.duration
-            
+
+        st.start_date = self.subtask_start_input.dateTime().toPython()
+        st.duration = self.subtask_duration_input.value()
+        st.refresh_end_date()
+
         session.add(st)
         session.commit()
         session.close()
